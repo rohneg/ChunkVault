@@ -54,6 +54,15 @@ std::string generateChunkId() {
     return id;
 }
 
+struct ChunkMetadata {
+    std::string fileId;
+    std::string chunkId;
+    int chunkNumber;
+    uintmax_t chunkSize;
+    std::string node1Location;
+    std::string node2Location;
+};
+
 int main() {
     std::string filePath;
 
@@ -109,6 +118,11 @@ int main() {
     while (input.peek() != EOF) {
         std::string chunkId = generateChunkId();
 
+        ChunkMetadata metadata;
+        metadata.fileId = fileId;
+        metadata.chunkId = chunkId;
+        metadata.chunkNumber = chunkNumber;
+
         std::string chunkPath =
             "storage/chunks/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
@@ -152,10 +166,17 @@ int main() {
         node1Output.close();
         node2Output.close();
 
-        std::cout << "Chunk " << chunkNumber
-                  << " [" << chunkId << "]"
-                  << " replicated to Node 1 and Node 2 ("
-                  << bytesInChunk << " bytes)\n";
+        metadata.chunkSize = bytesInChunk;
+        metadata.node1Location = node1Path;
+        metadata.node2Location = node2Path;
+
+        std::cout << "\nChunk Metadata\n";
+        std::cout << "File ID: " << metadata.fileId << '\n';
+        std::cout << "Chunk ID: " << metadata.chunkId << '\n';
+        std::cout << "Chunk Number: " << metadata.chunkNumber << '\n';
+        std::cout << "Chunk Size: " << metadata.chunkSize << " bytes\n";
+        std::cout << "Node 1: " << metadata.node1Location << '\n';
+        std::cout << "Node 2: " << metadata.node2Location << '\n';
 
         chunkNumber++;
     }
