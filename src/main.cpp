@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <random>
 
-
 namespace fs = std::filesystem;
 
 const uintmax_t BASE_SIZE = 1024ULL * 1024ULL;
@@ -33,6 +32,20 @@ std::string generateFileId() {
 
     std::random_device random;
     std::string id = "FILE_";
+
+    for (int i = 0; i < 4; i++) {
+        id += characters[random() % characters.size()];
+    }
+
+    return id;
+}
+
+std::string generateChunkId() {
+    const std::string characters =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    std::random_device random;
+    std::string id = "CHUNK_";
 
     for (int i = 0; i < 4; i++) {
         id += characters[random() % characters.size()];
@@ -93,56 +106,58 @@ int main() {
     std::ofstream node1Output;
     std::ofstream node2Output;
 
-    while (bytesInChunk < fileSize) {
-        if (!chunkOutput.is_open()) {
-            std::string chunkPath =
-                "storage/chunks/chunk_" + std::to_string(chunkNumber) + ".chunk";
+    while (input.peek() != EOF) {
+        std::string chunkId = generateChunkId();
 
-            std::string node1Path =
-                "storage/node1/chunk_" + std::to_string(chunkNumber) + ".chunk";
+        std::string chunkPath =
+            "storage/chunks/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
-            std::string node2Path =
-                "storage/node2/chunk_" + std::to_string(chunkNumber) + ".chunk";
+        std::string node1Path =
+            "storage/node1/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
-            chunkOutput.open(chunkPath, std::ios::binary);
-            node1Output.open(node1Path, std::ios::binary);
-            node2Output.open(node2Path, std::ios::binary);
+        std::string node2Path =
+            "storage/node2/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
-            if (!chunkOutput || !node1Output || !node2Output) {
-                std::cout << "\nError: Unable to create storage files.\n";
-                return 1;
-            }
+        chunkOutput.open(chunkPath, std::ios::binary);
+        node1Output.open(node1Path, std::ios::binary);
+        node2Output.open(node2Path, std::ios::binary);
+
+        if (!chunkOutput || !node1Output || !node2Output) {
+            std::cout << "\nError: Unable to create storage files.\n";
+            return 1;
         }
 
-        uintmax_t remaining = chunkSize - bytesInChunk;
+        bytesInChunk = 0;
 
-        size_t bytesToRead =
-            static_cast<size_t>(std::min<uintmax_t>(BUFFER_SIZE, remaining));
+        while (bytesInChunk < chunkSize && input.peek() != EOF) {
+            uintmax_t remaining = chunkSize - bytesInChunk;
 
-        input.read(buffer, bytesToRead);
-        std::streamsize bytesRead = input.gcount();
+            size_t bytesToRead =
+                static_cast<size_t>(std::min<uintmax_t>(BUFFER_SIZE, remaining));
 
-        if (bytesRead <= 0)
-            break;
+            input.read(buffer, bytesToRead);
+            std::streamsize bytesRead = input.gcount();
 
-        chunkOutput.write(buffer, bytesRead);
-        node1Output.write(buffer, bytesRead);
-        node2Output.write(buffer, bytesRead);
+            if (bytesRead <= 0)
+                break;
 
-        bytesInChunk += bytesRead;
+            chunkOutput.write(buffer, bytesRead);
+            node1Output.write(buffer, bytesRead);
+            node2Output.write(buffer, bytesRead);
 
-        if (bytesInChunk >= chunkSize) {
-            chunkOutput.close();
-            node1Output.close();
-            node2Output.close();
-
-            std::cout << "Chunk " << chunkNumber
-                      << " replicated to Node 1 and Node 2 ("
-                      << bytesInChunk << " bytes)\n";
-
-            chunkNumber++;
-            bytesInChunk = 0;
+            bytesInChunk += bytesRead;
         }
+
+        chunkOutput.close();
+        node1Output.close();
+        node2Output.close();
+
+        std::cout << "Chunk " << chunkNumber
+                  << " [" << chunkId << "]"
+                  << " replicated to Node 1 and Node 2 ("
+                  << bytesInChunk << " bytes)\n";
+
+        chunkNumber++;
     }
 
     std::cout << "\nFile chunking and replication completed successfully!\n";
