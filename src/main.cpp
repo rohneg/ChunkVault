@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <cmath>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -40,6 +41,12 @@ int main() {
 
     fs::path path(filePath);
     uintmax_t fileSize = fs::file_size(path);
+
+    if (fileSize == 0) {
+        std::cout << "\nError: File is empty.\n";
+        return 1;
+    }
+
     uintmax_t chunkSize = calculateChunkSize(fileSize);
 
     std::cout << "\nFile found successfully!\n";
@@ -55,29 +62,46 @@ int main() {
     }
 
     fs::create_directories("storage/chunks");
+    fs::create_directories("storage/node1");
+    fs::create_directories("storage/node2");
 
     char buffer[BUFFER_SIZE];
     uintmax_t bytesInChunk = 0;
     int chunkNumber = 1;
 
-    std::ofstream output;
+    std::ofstream chunkOutput;
+    std::ofstream node1Output;
+    std::ofstream node2Output;
 
     while (input) {
-        if (!output.is_open()) {
+        if (!chunkOutput.is_open()) {
             std::string chunkPath =
                 "storage/chunks/chunk_" +
                 std::to_string(chunkNumber) +
                 ".chunk";
 
-            output.open(chunkPath, std::ios::binary);
+            std::string node1Path =
+                "storage/node1/chunk_" +
+                std::to_string(chunkNumber) +
+                ".chunk";
 
-            if (!output) {
-                std::cout << "\nError: Unable to create chunk file.\n";
+            std::string node2Path =
+                "storage/node2/chunk_" +
+                std::to_string(chunkNumber) +
+                ".chunk";
+
+            chunkOutput.open(chunkPath, std::ios::binary);
+            node1Output.open(node1Path, std::ios::binary);
+            node2Output.open(node2Path, std::ios::binary);
+
+            if (!chunkOutput || !node1Output || !node2Output) {
+                std::cout << "\nError: Unable to create storage files.\n";
                 return 1;
             }
         }
 
         uintmax_t remaining = chunkSize - bytesInChunk;
+
         size_t bytesToRead =
             static_cast<size_t>(
                 std::min<uintmax_t>(BUFFER_SIZE, remaining)
@@ -90,32 +114,43 @@ int main() {
             break;
         }
 
-        output.write(buffer, bytesRead);
+        chunkOutput.write(buffer, bytesRead);
+        node1Output.write(buffer, bytesRead);
+        node2Output.write(buffer, bytesRead);
+
         bytesInChunk += static_cast<uintmax_t>(bytesRead);
 
         if (bytesInChunk >= chunkSize) {
-            output.close();
+            chunkOutput.close();
+            node1Output.close();
+            node2Output.close();
 
-            std::cout << "Created chunk "
+            std::cout << "Chunk "
                       << chunkNumber
-                      << " (" << bytesInChunk << " bytes)\n";
+                      << " replicated to Node 1 and Node 2 ("
+                      << bytesInChunk
+                      << " bytes)\n";
 
             chunkNumber++;
             bytesInChunk = 0;
         }
     }
 
-    if (output.is_open()) {
-        output.close();
+    if (chunkOutput.is_open()) {
+        chunkOutput.close();
+        node1Output.close();
+        node2Output.close();
 
-        std::cout << "Created chunk "
+        std::cout << "Chunk "
                   << chunkNumber
-                  << " (" << bytesInChunk << " bytes)\n";
+                  << " replicated to Node 1 and Node 2 ("
+                  << bytesInChunk
+                  << " bytes)\n";
     }
 
     input.close();
 
-    std::cout << "\nFile chunking completed successfully!\n";
+    std::cout << "\nFile chunking and replication completed successfully!\n";
 
     return 0;
 }
