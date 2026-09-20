@@ -1,8 +1,20 @@
 #include <iostream>
 #include <filesystem>
 #include <string>
+#include <cmath>
 
 namespace fs = std::filesystem;
+
+const uintmax_t BASE_SIZE = 1024ULL * 1024ULL; // 1 MB
+
+uintmax_t calculateChunkSize(uintmax_t fileSize) {
+    double chunkSize = std::sqrt(
+        static_cast<double>(fileSize) *
+        static_cast<double>(BASE_SIZE)
+    );
+
+    return static_cast<uintmax_t>(chunkSize);
+}
 
 int main() {
     std::string filePath;
@@ -26,9 +38,17 @@ int main() {
 
     fs::path path(filePath);
 
+    uintmax_t fileSize = fs::file_size(path);
+
     std::cout << "\nFile found successfully!\n";
     std::cout << "File name: " << path.filename() << '\n';
-    std::cout << "File size: " << fs::file_size(path) << " bytes\n";
+    std::cout << "File size: " << fileSize << " bytes\n";
+
+    uintmax_t chunkSize = calculateChunkSize(fileSize);
+
+    std::cout << "Calculated chunk size: "
+              << chunkSize
+              << " bytes\n";
 
     return 0;
 }
