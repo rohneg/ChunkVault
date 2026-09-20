@@ -4,6 +4,8 @@
 #include <fstream>
 #include <cmath>
 #include <algorithm>
+#include <random>
+
 
 namespace fs = std::filesystem;
 
@@ -11,12 +13,32 @@ const uintmax_t BASE_SIZE = 1024ULL * 1024ULL;
 const size_t BUFFER_SIZE = 4ULL * 1024ULL * 1024ULL;
 
 uintmax_t calculateChunkSize(uintmax_t fileSize) {
-    double chunkSize = std::sqrt(
-        static_cast<double>(fileSize) *
-        static_cast<double>(BASE_SIZE)
+    const uintmax_t MIN_CHUNK = 64ULL * 1024ULL;
+    const uintmax_t MAX_CHUNK = 256ULL * 1024ULL * 1024ULL;
+
+    uintmax_t chunkSize = static_cast<uintmax_t>(
+        std::sqrt(static_cast<double>(fileSize) * BASE_SIZE)
     );
 
-    return static_cast<uintmax_t>(chunkSize);
+    chunkSize = std::max(chunkSize, MIN_CHUNK);
+    chunkSize = std::min(chunkSize, MAX_CHUNK);
+    chunkSize = std::min(chunkSize, fileSize);
+
+    return chunkSize;
+}
+
+std::string generateFileId() {
+    const std::string characters =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    std::random_device random;
+    std::string id = "FILE_";
+
+    for (int i = 0; i < 4; i++) {
+        id += characters[random() % characters.size()];
+    }
+
+    return id;
 }
 
 int main() {
@@ -29,13 +51,8 @@ int main() {
     std::cout << "Enter file path: ";
     std::getline(std::cin, filePath);
 
-    if (!fs::exists(filePath)) {
-        std::cout << "\nError: File not found.\n";
-        return 1;
-    }
-
-    if (!fs::is_regular_file(filePath)) {
-        std::cout << "\nError: Selected path is not a file.\n";
+    if (!fs::exists(filePath) || !fs::is_regular_file(filePath)) {
+        std::cout << "\nError: Invalid file path.\n";
         return 1;
     }
 
@@ -47,9 +64,12 @@ int main() {
         return 1;
     }
 
+    std::string fileId = generateFileId();
+
     uintmax_t chunkSize = calculateChunkSize(fileSize);
 
     std::cout << "\nFile found successfully!\n";
+    std::cout << "File ID: " << fileId << '\n';
     std::cout << "File name: " << path.filename() << '\n';
     std::cout << "File size: " << fileSize << " bytes\n";
     std::cout << "Calculated chunk size: " << chunkSize << " bytes\n";
@@ -73,22 +93,16 @@ int main() {
     std::ofstream node1Output;
     std::ofstream node2Output;
 
-    while (input) {
+    while (bytesInChunk < fileSize) {
         if (!chunkOutput.is_open()) {
             std::string chunkPath =
-                "storage/chunks/chunk_" +
-                std::to_string(chunkNumber) +
-                ".chunk";
+                "storage/chunks/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
             std::string node1Path =
-                "storage/node1/chunk_" +
-                std::to_string(chunkNumber) +
-                ".chunk";
+                "storage/node1/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
             std::string node2Path =
-                "storage/node2/chunk_" +
-                std::to_string(chunkNumber) +
-                ".chunk";
+                "storage/node2/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
             chunkOutput.open(chunkPath, std::ios::binary);
             node1Output.open(node1Path, std::ios::binary);
@@ -103,52 +117,33 @@ int main() {
         uintmax_t remaining = chunkSize - bytesInChunk;
 
         size_t bytesToRead =
-            static_cast<size_t>(
-                std::min<uintmax_t>(BUFFER_SIZE, remaining)
-            );
+            static_cast<size_t>(std::min<uintmax_t>(BUFFER_SIZE, remaining));
 
         input.read(buffer, bytesToRead);
         std::streamsize bytesRead = input.gcount();
 
-        if (bytesRead <= 0) {
+        if (bytesRead <= 0)
             break;
-        }
 
         chunkOutput.write(buffer, bytesRead);
         node1Output.write(buffer, bytesRead);
         node2Output.write(buffer, bytesRead);
 
-        bytesInChunk += static_cast<uintmax_t>(bytesRead);
+        bytesInChunk += bytesRead;
 
         if (bytesInChunk >= chunkSize) {
             chunkOutput.close();
             node1Output.close();
             node2Output.close();
 
-            std::cout << "Chunk "
-                      << chunkNumber
+            std::cout << "Chunk " << chunkNumber
                       << " replicated to Node 1 and Node 2 ("
-                      << bytesInChunk
-                      << " bytes)\n";
+                      << bytesInChunk << " bytes)\n";
 
             chunkNumber++;
             bytesInChunk = 0;
         }
     }
-
-    if (chunkOutput.is_open()) {
-        chunkOutput.close();
-        node1Output.close();
-        node2Output.close();
-
-        std::cout << "Chunk "
-                  << chunkNumber
-                  << " replicated to Node 1 and Node 2 ("
-                  << bytesInChunk
-                  << " bytes)\n";
-    }
-
-    input.close();
 
     std::cout << "\nFile chunking and replication completed successfully!\n";
 
