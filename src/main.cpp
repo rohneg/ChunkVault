@@ -8,22 +8,29 @@
 
 namespace fs = std::filesystem;
 
-const uintmax_t BASE_SIZE = 1024ULL * 1024ULL;
 const size_t BUFFER_SIZE = 4ULL * 1024ULL * 1024ULL;
 
 uintmax_t calculateChunkSize(uintmax_t fileSize) {
     const uintmax_t MIN_CHUNK = 64ULL * 1024ULL;
-    const uintmax_t MAX_CHUNK = 256ULL * 1024ULL * 1024ULL;
+    const uintmax_t MAX_CHUNK = 10ULL * 1024ULL * 1024ULL * 1024ULL;
 
-    uintmax_t chunkSize = static_cast<uintmax_t>(
-        std::sqrt(static_cast<double>(fileSize) * BASE_SIZE)
-    );
+    const double BASE_CHUNK = 256.0 * 1024.0 * 1024.0;
+    const double BASE_FILE = 1024.0 * 1024.0 * 1024.0;
+    const double GROWTH_FACTOR = 0.65;
 
-    chunkSize = std::max(chunkSize, MIN_CHUNK);
-    chunkSize = std::min(chunkSize, MAX_CHUNK);
-    chunkSize = std::min(chunkSize, fileSize);
+    double chunkSize = BASE_CHUNK *
+        std::pow(
+            static_cast<double>(fileSize) / BASE_FILE,
+            GROWTH_FACTOR
+        );
 
-    return chunkSize;
+    uintmax_t result = static_cast<uintmax_t>(chunkSize);
+
+    result = std::max(result, MIN_CHUNK);
+    result = std::min(result, MAX_CHUNK);
+    result = std::min(result, fileSize);
+
+    return result;
 }
 
 std::string generateFileId() {
@@ -88,13 +95,43 @@ int main() {
 
     std::string fileId = generateFileId();
 
-    uintmax_t chunkSize = calculateChunkSize(fileSize);
+    int chunkMode;
+
+    std::cout << "\nChoose chunking mode:\n";
+    std::cout << "1. Automatic\n";
+    std::cout << "2. Manual number of chunks\n";
+    std::cout << "Enter choice: ";
+    std::cin >> chunkMode;
+
+    uintmax_t chunkSize;
+    uintmax_t totalChunks;
+
+    if (chunkMode == 1) {
+        chunkSize = calculateChunkSize(fileSize);
+        totalChunks = (fileSize + chunkSize - 1) / chunkSize;
+    } 
+    else if (chunkMode == 2) {
+        std::cout << "Enter number of chunks: ";
+        std::cin >> totalChunks;
+
+        if (totalChunks == 0 || totalChunks > fileSize) {
+            std::cout << "\nError: Invalid number of chunks.\n";
+            return 1;
+        }
+
+        chunkSize = (fileSize + totalChunks - 1) / totalChunks;
+    } 
+    else {
+        std::cout << "\nError: Invalid choice.\n";
+        return 1;
+    }
 
     std::cout << "\nFile found successfully!\n";
     std::cout << "File ID: " << fileId << '\n';
     std::cout << "File name: " << path.filename() << '\n';
     std::cout << "File size: " << fileSize << " bytes\n";
-    std::cout << "Calculated chunk size: " << chunkSize << " bytes\n";
+    std::cout << "Total chunks: " << totalChunks << '\n';
+    std::cout << "Chunk size: " << chunkSize << " bytes\n";
 
     std::ifstream input(filePath, std::ios::binary);
 
@@ -110,10 +147,6 @@ int main() {
     char buffer[BUFFER_SIZE];
     uintmax_t bytesInChunk = 0;
     int chunkNumber = 1;
-
-    std::ofstream chunkOutput;
-    std::ofstream node1Output;
-    std::ofstream node2Output;
 
     while (input.peek() != EOF) {
         std::string chunkId = generateChunkId();
@@ -132,9 +165,9 @@ int main() {
         std::string node2Path =
             "storage/node2/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
-        chunkOutput.open(chunkPath, std::ios::binary);
-        node1Output.open(node1Path, std::ios::binary);
-        node2Output.open(node2Path, std::ios::binary);
+        std::ofstream chunkOutput(chunkPath, std::ios::binary);
+        std::ofstream node1Output(node1Path, std::ios::binary);
+        std::ofstream node2Output(node2Path, std::ios::binary);
 
         if (!chunkOutput || !node1Output || !node2Output) {
             std::cout << "\nError: Unable to create storage files.\n";
@@ -147,7 +180,9 @@ int main() {
             uintmax_t remaining = chunkSize - bytesInChunk;
 
             size_t bytesToRead =
-                static_cast<size_t>(std::min<uintmax_t>(BUFFER_SIZE, remaining));
+                static_cast<size_t>(
+                    std::min<uintmax_t>(BUFFER_SIZE, remaining)
+                );
 
             input.read(buffer, bytesToRead);
             std::streamsize bytesRead = input.gcount();

@@ -1,3 +1,24 @@
 ChunkVault is a fault-tolerant file storage system.
 This file is being used to test file chunking.
 We are making this for our pbl.
+This is main chunking file.
+
+ChunkVault is a fault-tolerant file storage system designed to store large files efficiently and reliably. The system divides a large file into multiple chunks and stores those chunks across different storage nodes. Each chunk can have one or more replicas so that the original data can still be recovered if a storage node fails.
+
+ChunkVault uses dynamic chunk sizing so that different file sizes can be processed efficiently. Small files can remain as a single chunk, while large files can be divided into larger logical chunks. The system processes each chunk using a fixed memory buffer, which allows very large chunks to be handled without loading the entire chunk into RAM.
+
+The system maintains metadata for every file and every chunk. File metadata includes the file identifier, file name, file size, and other information required for reconstruction. Chunk metadata includes the chunk identifier, chunk number, chunk size, and the locations of its replicas.
+
+Replication is an important part of the system because it improves fault tolerance. When a chunk is stored on Node 1, a replica can also be stored on Node 2. If one node becomes unavailable, the replica can be used to recover the missing data. This approach allows the system to continue operating even when individual storage locations fail.
+
+ChunkVault is designed as an operating-system and database-oriented project. The operating system concepts include file handling, buffering, storage management, processes, threads, synchronization, locks, and concurrent operations. The database component manages file metadata, chunk metadata, relationships between files and chunks, transactions, constraints, and indexing.
+
+The system can detect missing or corrupted chunks using metadata and checksums. When corruption or failure is detected, the system can identify an available replica and use it for recovery. Recovery information can also be logged so that the system can track failures and recovery operations.
+
+Large file processing is one of the major goals of ChunkVault. A very large file can contain many gigabytes of data, but the system does not need to load the complete file into memory. Instead, the file is processed using smaller buffers. This makes the storage system more memory efficient and allows it to work with files that are much larger than the available RAM.
+
+ChunkVault also focuses on performance. Multiple chunks can eventually be processed in parallel using multiple worker threads. Synchronization mechanisms such as mutexes and locks can be used to protect shared resources. Database transactions can be used to maintain consistency when multiple operations occur at the same time.
+
+The ultimate goal of ChunkVault is to provide reliable, scalable, and fault-tolerant file storage using chunking, replication, metadata management, database support, concurrency, failure detection, and recovery mechanisms.
+
+ChunkVault is a practical implementation of concepts from operating systems and database management systems. It demonstrates how file storage can be designed to handle large data, storage failures, concurrent operations, and data recovery while maintaining consistency and reliability.
