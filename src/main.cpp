@@ -5,6 +5,7 @@
 #include <cmath>
 #include <algorithm>
 #include <random>
+#include <CommonCrypto/CommonDigest.h>
 
 namespace fs = std::filesystem;
 
@@ -32,6 +33,7 @@ uintmax_t calculateChunkSize(uintmax_t fileSize) {
 
     return result;
 }
+
 
 std::string generateFileId() {
     const std::string characters =
