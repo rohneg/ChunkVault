@@ -72,6 +72,7 @@ struct ChunkMetadata {
     uintmax_t chunkSize;
     std::string node1Location;
     std::string node2Location;
+    std::string checksum;
 };
 
 std::string calculateChecksum(const std::string& filePath) {
