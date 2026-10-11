@@ -106,6 +106,26 @@ std::string calculateChecksum(const std::string& filePath) {
     return checksum;
 }
 
+
+std::string checkChunkStatus(const std::string& filePath,
+                             const std::string& expectedChecksum) {
+    if (!fs::exists(filePath) || !fs::is_regular_file(filePath)) {
+        return "MISSING";
+    }
+
+    std::string actualChecksum = calculateChecksum(filePath);
+
+    if (actualChecksum.empty()) {
+        return "ERROR";
+    }
+
+    if (actualChecksum == expectedChecksum) {
+        return "HEALTHY";
+    }
+
+    return "CORRUPTED";
+}
+
 int main() {
     std::string filePath;
 
@@ -252,7 +272,7 @@ int main() {
                  return 1;
       }
 
-        std::cout << "\nChunk Metadata\n";
+        std::cout << "\nChunk Metadata:\n";
         std::cout << "File ID: " << metadata.fileId << '\n';
         std::cout << "Chunk ID: " << metadata.chunkId << '\n';
         std::cout << "Chunk Number: " << metadata.chunkNumber << '\n';

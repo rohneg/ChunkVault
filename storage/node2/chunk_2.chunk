@@ -1,0 +1,9 @@
+replicas.
+
+Replication is an important part of the system because it improves fault tolerance. When a chunk is stored on Node 1, a replica can also be stored on Node 2. If one node becomes unavailable, the replica can be used to recover the missing data. This approach allows the system to continue operating even when individual storage locations fail.
+
+ChunkVault is designed as an operating-system and database-oriented project. The operating system concepts include file handling, buffering, storage management, processes, threads, synchronization, locks, and concurrent operations. The database component manages file metadata, chunk metadata, relationships between files and chunks, transactions, constraints, and indexing.
+
+The system can detect missing or corrupted chunks using metadata and checksums. When corruption or failure is detected, the system can identify an available replica and use it for recovery. Recovery information can also be logged so that the system can track failures and recovery operations.
+
+Large file processing is one of the major goals of ChunkVault. A very large file can contain
