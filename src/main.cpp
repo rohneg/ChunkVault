@@ -74,6 +74,36 @@ struct ChunkMetadata {
     std::string node2Location;
 };
 
+std::string calculateChecksum(const std::string& filePath) {
+    std::ifstream file(filePath, std::ios::binary);
+
+    if (!file) {
+        return "";
+    }
+
+    CC_SHA256_CTX context;
+    CC_SHA256_Init(&context);
+
+    char buffer[4096];
+
+    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+        CC_SHA256_Update(&context, buffer, static_cast<CC_LONG>(file.gcount()));
+    }
+
+    unsigned char hash[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256_Final(hash, &context);
+
+    std::string checksum;
+
+    for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
+        char hex[3];
+        std::snprintf(hex, sizeof(hex), "%02x", hash[i]);
+        checksum += hex;
+    }
+
+    return checksum;
+}
+
 int main() {
     std::string filePath;
 
