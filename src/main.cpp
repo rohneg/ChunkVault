@@ -155,6 +155,22 @@ void verifyExistingChunks() {
 }
 
 int main() {
+    int choice;
+
+    std::cout << "\n1. Store a file\n";
+    std::cout << "2. Verify existing chunks\n";
+    std::cout << "Enter choice: ";
+    std::cin >> choice;
+    std::cin.ignore(10000, '\n');
+    if (choice == 2) {
+        verifyExistingChunks();
+        return 0;
+    }
+    if (choice != 1) {
+        std::cout << "Invalid choice.\n";
+        return 1;
+    }
+
     std::string filePath;
 
     std::cout << "=================================\n";
@@ -227,6 +243,14 @@ int main() {
     fs::create_directories("storage/chunks");
     fs::create_directories("storage/node1");
     fs::create_directories("storage/node2");
+
+    std::ofstream metadataFile("storage/chunk_metadata.txt",std::ios::trunc);
+    if (!metadataFile) {
+        std::cout << "Error: Unable to create metadata file.\n";
+        return 1;
+    }
+
+metadataFile.close();
 
     char buffer[BUFFER_SIZE];
     uintmax_t bytesInChunk = 0;
