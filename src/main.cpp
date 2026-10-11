@@ -270,12 +270,6 @@ int main() {
 
         metadata.checksum = calculateChecksum(chunkPath);
 
-        if (metadata.checksum.empty()) {
-         std::cerr << "Error: Failed to calculate checksum for chunk "
-              << metadata.chunkId << '\n';
-                 return 1;
-      }
-
         std::cout << "\nChunk Metadata:\n";
         std::cout << "File ID: " << metadata.fileId << '\n';
         std::cout << "Chunk ID: " << metadata.chunkId << '\n';
