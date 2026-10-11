@@ -126,6 +126,34 @@ std::string checkChunkStatus(const std::string& filePath,
     return "CORRUPTED";
 }
 
+
+void verifyExistingChunks() {
+    std::ifstream metadataFile("storage/chunk_metadata.txt");
+
+    if (!metadataFile) {
+        std::cout << "No saved metadata found. Store a file first.\n";
+        return;
+    }
+
+    std::string chunkPath;
+    std::string node1Path;
+    std::string node2Path;
+    std::string expectedChecksum;
+
+    while (std::getline(metadataFile, chunkPath, '|') &&
+           std::getline(metadataFile, node1Path, '|') &&
+           std::getline(metadataFile, node2Path, '|') &&
+           std::getline(metadataFile, expectedChecksum)) {
+        std::cout << "\nChunk: " << chunkPath << '\n';
+        std::cout << "Main Chunk: "
+                  << checkChunkStatus(chunkPath, expectedChecksum) << '\n';
+        std::cout << "Node 1: "
+                  << checkChunkStatus(node1Path, expectedChecksum) << '\n';
+        std::cout << "Node 2: "
+                  << checkChunkStatus(node2Path, expectedChecksum) << '\n';
+    }
+}
+
 int main() {
     std::string filePath;
 
