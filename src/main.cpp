@@ -73,6 +73,7 @@ struct ChunkMetadata {
     std::string node1Location;
     std::string node2Location;
     std::string checksum;
+
 };
 
 std::string calculateChecksum(const std::string& filePath) {
@@ -236,15 +237,27 @@ int main() {
         node1Output.close();
         node2Output.close();
 
+
+           
+
         metadata.chunkSize = bytesInChunk;
         metadata.node1Location = node1Path;
         metadata.node2Location = node2Path;
+
+        metadata.checksum = calculateChecksum(chunkPath);
+
+        if (metadata.checksum.empty()) {
+         std::cerr << "Error: Failed to calculate checksum for chunk "
+              << metadata.chunkId << '\n';
+                 return 1;
+      }
 
         std::cout << "\nChunk Metadata\n";
         std::cout << "File ID: " << metadata.fileId << '\n';
         std::cout << "Chunk ID: " << metadata.chunkId << '\n';
         std::cout << "Chunk Number: " << metadata.chunkNumber << '\n';
         std::cout << "Chunk Size: " << metadata.chunkSize << " bytes\n";
+        std::cout << "SHA-256: " << metadata.checksum << '\n';
         std::cout << "Node 1: " << metadata.node1Location << '\n';
         std::cout << "Node 2: " << metadata.node2Location << '\n';
 
