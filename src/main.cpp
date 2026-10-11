@@ -252,17 +252,21 @@ int main() {
 
             bytesInChunk += bytesRead;
         }
-
         chunkOutput.close();
         node1Output.close();
         node2Output.close();
-
-
-           
-
         metadata.chunkSize = bytesInChunk;
         metadata.node1Location = node1Path;
         metadata.node2Location = node2Path;
+
+
+        metadata.checksum = calculateChecksum(chunkPath);
+
+        if (metadata.checksum.empty()) {
+            std::cerr << "Error: Failed to calculate checksum for chunk "
+            << metadata.chunkId << '\n';
+        return 1;
+        }
 
         metadata.checksum = calculateChecksum(chunkPath);
 
@@ -280,11 +284,20 @@ int main() {
         std::cout << "SHA-256: " << metadata.checksum << '\n';
         std::cout << "Node 1: " << metadata.node1Location << '\n';
         std::cout << "Node 2: " << metadata.node2Location << '\n';
+        std::string mainStatus =checkChunkStatus(chunkPath, metadata.checksum);
+        std::string node1Status =checkChunkStatus(node1Path, metadata.checksum);
+        std::string node2Status =checkChunkStatus(node2Path, metadata.checksum);
+        std::cout << "\nIntegrity Status\n";
+        std::cout << "Main Chunk: " << mainStatus << '\n';
+        std::cout << "Node 1: " << node1Status << '\n';
+        std::cout << "Node 2: " << node2Status << '\n';
+
+        if (mainStatus != "HEALTHY" || node1Status != "HEALTHY" || node2Status != "HEALTHY") {
+            std::cout << "WARNING: Integrity issue detected!\n";
+        }
 
         chunkNumber++;
     }
-
     std::cout << "\nFile chunking and replication completed successfully!\n";
-
     return 0;
 }
