@@ -310,18 +310,21 @@ metadataFile.close();
         metadata.chunkSize = bytesInChunk;
         metadata.node1Location = node1Path;
         metadata.node2Location = node2Path;
-
-
+     
         metadata.checksum = calculateChecksum(chunkPath);
 
         if (metadata.checksum.empty()) {
-            std::cerr << "Error: Failed to calculate checksum for chunk "
-            << metadata.chunkId << '\n';
-        return 1;
+            std::cerr << "Error: Failed to calculate checksum for chunk "<< metadata.chunkId << '\n';
+            return 1;
         }
-
-        metadata.checksum = calculateChecksum(chunkPath);
-
+        std::ofstream metadataFile("storage/chunk_metadata.txt",std::ios::app);
+        if (!metadataFile) {
+            std::cout << "Error: Unable to save metadata.\n";
+            return 1;
+        }
+        metadataFile << chunkPath << '|'<< node1Path << '|'<< node2Path << '|'<< metadata.checksum << '\n';
+        metadataFile.close();
+        
         std::cout << "\nChunk Metadata:\n";
         std::cout << "File ID: " << metadata.fileId << '\n';
         std::cout << "Chunk ID: " << metadata.chunkId << '\n';
