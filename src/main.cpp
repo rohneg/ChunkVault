@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <random>
 #include <CommonCrypto/CommonDigest.h>
+#include <cstdio>
+
 
 namespace fs = std::filesystem;
 
