@@ -65,7 +65,14 @@ std::string generateChunkId() {
     return id;
 }
 
-
+struct ChunkMetadata {
+    std::string fileId;
+    std::string chunkId;
+    int chunkNumber;
+    uintmax_t chunkSize;
+    std::string node1Location;
+    std::string node2Location;
+};
 
 std::string calculateChecksum(const std::string& filePath) {
     std::ifstream file(filePath, std::ios::binary);
