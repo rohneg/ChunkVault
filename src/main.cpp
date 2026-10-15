@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <sstream>
 #include <vector>
+#include "../database/Database.h"
 
 
 namespace fs = std::filesystem;
@@ -294,7 +295,22 @@ for (const auto& entry : fs::directory_iterator("storage")) {
 
 
 int main() {
+    
     int choice;
+
+    if (fs::exists("storage") && fs::is_directory("storage")) {
+        Database syncDatabase;
+
+        if (syncDatabase.connect()) {
+            if (syncDatabase.synchronizeDeletedFiles("storage")) {
+                std::cout << "Storage and MySQL synchronization complete.\n";
+            } else {
+                std::cout << "Warning: Storage synchronization failed.\n";
+            }
+        } else {
+            std::cout << "Warning: MySQL unavailable; synchronization skipped.\n";
+        }
+    }
 
     std::cout << "\n1. Store a file\n";
     std::cout << "2. Verify existing chunks\n";
@@ -397,9 +413,29 @@ int main() {
         return 1;
     }
 
+
     metadataFile.close();
 
+    Database database;
+
+    if (!database.connect()) {
+        std::cout << "Error: MySQL connection failed.\n";
+        return 1;
+    }
+
+    if (!database.insertFile(
+        fileId,
+        path.filename().string(),
+        fileSize,
+        static_cast<unsigned int>(totalChunks))) {
+            std::cout << "Error: Unable to save file metadata to MySQL.\n";
+            return 1;
+    }
+
+    std::cout << "File metadata saved to MySQL successfully.\n";
+
     char buffer[BUFFER_SIZE];
+
     uintmax_t bytesInChunk = 0;
     int chunkNumber = 1;
 
@@ -455,10 +491,20 @@ int main() {
      
         metadata.checksum = calculateChecksum(chunkPath);
 
-        if (metadata.checksum.empty()) {
-            std::cerr << "Error: Failed to calculate checksum for chunk "<< metadata.chunkId << '\n';
-            return 1;
+        if (!database.insertChunk(
+            metadata.chunkId,
+            metadata.fileId,
+            metadata.chunkNumber,
+            metadata.chunkSize,
+            metadata.checksum,
+            chunkPath,
+            node1Path,
+            node2Path)) {
+                std::cout << "Error: Unable to save chunk metadata to MySQL.\n";
+                return 1;
         }
+
+        std::cout << "Chunk metadata saved to MySQL successfully.\n";
         std::ofstream metadataFile("storage/chunk_metadata.txt",std::ios::app);
         if (!metadataFile) {
             std::cout << "Error: Unable to save metadata.\n";
