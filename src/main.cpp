@@ -138,7 +138,64 @@ std::string checkChunkStatus(const std::string& filePath,
     return "CORRUPTED";
 }
 
+void recoverChunk(const StoredChunk& chunk) {
+    std::string source;
 
+    if (checkChunkStatus(chunk.chunkPath, chunk.checksum) == "HEALTHY") {
+        source = chunk.chunkPath;
+    } else if (checkChunkStatus(chunk.node1Path, chunk.checksum) == "HEALTHY") {
+        source = chunk.node1Path;
+    } else if (checkChunkStatus(chunk.node2Path, chunk.checksum) == "HEALTHY") {
+        source = chunk.node2Path;
+    }
+
+    if (source.empty()) {
+        std::cout << "RECOVERY FAILED: All three copies are missing or corrupted.\n";
+        return;
+    }
+
+    std::cout << "Healthy recovery source: " << source << '\n';
+
+    std::vector<std::string> targets = {
+        chunk.chunkPath,
+        chunk.node1Path,
+        chunk.node2Path
+    };
+
+    for (const auto& target : targets) {
+        if (target == source ||
+            checkChunkStatus(target, chunk.checksum) == "HEALTHY") {
+            continue;
+        }
+
+        std::error_code error;
+
+        fs::create_directories(fs::path(target).parent_path(), error);
+
+        if (error) {
+            std::cout << "Recovery failed for " << target
+                      << ": " << error.message() << '\n';
+            continue;
+        }
+
+        fs::copy_file(
+            source,
+            target,
+            fs::copy_options::overwrite_existing,
+            error
+        );
+
+        if (error) {
+            std::cout << "Recovery failed for " << target
+                      << ": " << error.message() << '\n';
+        } else if (checkChunkStatus(target, chunk.checksum) == "HEALTHY") {
+            std::cout << "RECOVERED: " << target << '\n';
+        } else {
+            std::cout << "RECOVERY VERIFICATION FAILED: "
+                      << target << '\n';
+        }
+    }
+}
 
 void verifyExistingChunks() {
     std::ifstream metadataFile("storage/chunk_metadata.txt");
@@ -291,11 +348,57 @@ for (const auto& entry : fs::directory_iterator("storage")) {
     }
 
     std::cout << "\nTotal Chunks: " << chunkNumber << '\n';
+
+    std::cout << "\n1. Recover unhealthy chunks\n";
+    std::cout << "0. Back\n";
+    std::cout << "Choose an option: ";
+
+    int recoveryChoice;
+
+    if (!(std::cin >> recoveryChoice)) {
+        std::cin.clear();
+        std::cin.ignore(10000, '\n');
+        std::cout << "Invalid choice.\n";
+        return;
+    }
+
+    if (recoveryChoice == 1) {
+        for (const auto& chunk : chunks) {
+            if (chunk.fileId == selectedFile.first) {
+                recoverChunk(chunk);
+            }
+        }
+
+        std::cout << "\n===== Updated Integrity Report =====\n";
+
+        chunkNumber = 0;
+
+        for (const auto& chunk : chunks) {
+            if (chunk.fileId != selectedFile.first) {
+                continue;
+            }
+
+            chunkNumber++;
+
+            std::cout << "\nChunk " << chunkNumber << '\n';
+            std::cout << "Main Chunk: "
+                      << checkChunkStatus(chunk.chunkPath, chunk.checksum) << '\n';
+            std::cout << "Node 1: "
+                      << checkChunkStatus(chunk.node1Path, chunk.checksum) << '\n';
+            std::cout << "Node 2: "
+                      << checkChunkStatus(chunk.node2Path, chunk.checksum) << '\n';
+        }
+
+        std::cout << "\nTotal Chunks: " << chunkNumber << '\n';
+        } else if (recoveryChoice != 0) {
+        std::cout << "Invalid choice.\n";
+        }
+
 }
 
 
 int main() {
-    
+
     int choice;
 
     if (fs::exists("storage") && fs::is_directory("storage")) {
