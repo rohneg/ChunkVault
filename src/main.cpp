@@ -188,8 +188,8 @@ void verifyExistingChunks() {
         else {
             continue;
         }
-        fs::path fileDirectory = fs::path("storage") / chunk.fileId;
-
+        fs::path chunkPath(chunk.chunkPath);
+        fs::path fileDirectory = chunkPath.parent_path().parent_path();
         if (!fs::exists(fileDirectory) || !fs::is_directory(fileDirectory)) {
             continue;
         }
@@ -203,22 +203,37 @@ void verifyExistingChunks() {
         return;
     }
 
-    std::vector<std::pair<std::string, std::string>> files;
 
-    for (const auto& chunk : chunks) {
-        bool found = false;
+std::vector<std::pair<std::string, std::string>> files;
 
-        for (const auto& file : files) {
-            if (file.first == chunk.fileId) {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) {
-            files.push_back({chunk.fileId, chunk.fileName});
-        }
+for (const auto& entry : fs::directory_iterator("storage")) {
+    if (!entry.is_directory()) {
+        continue;
     }
+
+    fs::path chunksPath = entry.path() / "chunks";
+
+    if (!fs::exists(chunksPath) || !fs::is_directory(chunksPath)) {
+        continue;
+    }
+
+    std::string folderName = entry.path().filename().string();
+    size_t idPosition = folderName.rfind(" (");
+
+    if (idPosition == std::string::npos ||
+        folderName.back() != ')') {
+        continue;
+    }
+
+    std::string fileName = folderName.substr(0, idPosition);
+    std::string fileId = folderName.substr(
+        idPosition + 2,
+        folderName.size() - idPosition - 3
+    );
+
+    files.push_back({fileId, fileName});
+}
+
 
     std::cout << "\n===== Select File to Verify =====\n";
 
