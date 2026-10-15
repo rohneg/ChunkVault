@@ -1,0 +1,13 @@
+storage/chunks/chunk_1.chunk|storage/node1/chunk_1.chunk|storage/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+storage/chunks/chunk_2.chunk|storage/node1/chunk_2.chunk|storage/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
+storage/FILE_FSHV/chunks/chunk_1.chunk|storage/FILE_FSHV/node1/chunk_1.chunk|storage/FILE_FSHV/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+storage/FILE_FSHV/chunks/chunk_2.chunk|storage/FILE_FSHV/node1/chunk_2.chunk|storage/FILE_FSHV/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
+FILE_5N9J|test.txt|storage/FILE_5N9J/chunks/chunk_1.chunk|storage/FILE_5N9J/node1/chunk_1.chunk|storage/FILE_5N9J/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+FILE_5N9J|test.txt|storage/FILE_5N9J/chunks/chunk_2.chunk|storage/FILE_5N9J/node1/chunk_2.chunk|storage/FILE_5N9J/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
+FILE_NYE0|test.txt|storage/FILE_NYE0/chunks/chunk_1.chunk|storage/FILE_NYE0/node1/chunk_1.chunk|storage/FILE_NYE0/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+FILE_NYE0|test.txt|storage/FILE_NYE0/chunks/chunk_2.chunk|storage/FILE_NYE0/node1/chunk_2.chunk|storage/FILE_NYE0/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
+FILE_B4EL|test.txt|storage/FILE_B4EL/chunks/chunk_1.chunk|storage/FILE_B4EL/node1/chunk_1.chunk|storage/FILE_B4EL/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+FILE_B4EL|test.txt|storage/FILE_B4EL/chunks/chunk_2.chunk|storage/FILE_B4EL/node1/chunk_2.chunk|storage/FILE_B4EL/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
+FILE_9URS|large.txt|storage/FILE_9URS/chunks/chunk_1.chunk|storage/FILE_9URS/node1/chunk_1.chunk|storage/FILE_9URS/node2/chunk_1.chunk|3eed774aeda68fd85efb648f1a15829ff10181bfbcf7487d38e679d7be6d3ac4
+FILE_9URS|large.txt|storage/FILE_9URS/chunks/chunk_2.chunk|storage/FILE_9URS/node1/chunk_2.chunk|storage/FILE_9URS/node2/chunk_2.chunk|0638d2703b5a38da2306edffec048cbaa4374c8dc0e2242186f0157147d2277e
+FILE_9URS|large.txt|storage/FILE_9URS/chunks/chunk_3.chunk|storage/FILE_9URS/node1/chunk_3.chunk|storage/FILE_9URS/node2/chunk_3.chunk|111600f54ca150ab2aa31347cb1bf341c1e5e29963f445ce8317c56b8bdb746a

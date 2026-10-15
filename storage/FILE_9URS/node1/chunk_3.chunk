@@ -1,0 +1,23 @@
+ded during testing. Performance conclusions should be based on measured results rather than assumptions.
+
+CHUNKVAULT TEST RECORD 001
+
+Input validation checks whether the selected file exists and can be opened. Chunk creation divides the file into portions based on the selected chunk size. Buffered reading transfers data into memory in manageable portions. Chunk writing stores each portion at its designated location. Replica creation writes additional copies of the chunk to the configured replica locations.
+
+CHUNKVAULT TEST RECORD 002
+
+Integrity verification calculates the checksum of a stored chunk and compares it with the expected checksum. A matching checksum indicates that the data matches the recorded version. A mismatching checksum indicates that the data has changed. A missing file indicates that the expected data is unavailable at that location. These results help distinguish healthy data from damaged or unavailable data.
+
+CHUNKVAULT TEST RECORD 003
+
+Multiple-file storage requires isolated storage paths and persistent metadata. The system should generate a separate identifier for each original file. Every chunk record must reference its original file identifier. Replica paths must be recorded accurately so the system can locate and verify each copy independently.
+
+CHUNKVAULT TEST RECORD 004
+
+Recovery begins by identifying the failed chunk and examining the available replicas. The system should verify candidate replicas using their expected checksums. Only a replica that passes verification should be used as the source for restoration. After restoration, the recovered chunk should be verified again.
+
+CHUNKVAULT TEST RECORD 005
+
+Reconstruction reads chunks in their original sequence and writes their contents to the output file. The final output should have the same size and byte contents as the original input. Tests should include files with multiple chunks and files whose size is not an exact multiple of the chunk size.
+
+END OF TEST RECORDS

@@ -188,13 +188,18 @@ void verifyExistingChunks() {
         else {
             continue;
         }
+        fs::path fileDirectory = fs::path("storage") / chunk.fileId;
+
+        if (!fs::exists(fileDirectory) || !fs::is_directory(fileDirectory)) {
+            continue;
+        }
         chunks.push_back(chunk);
     }
 
     metadataFile.close();
 
     if (chunks.empty()) {
-        std::cout << "No valid file metadata found. Store a file first.\n";
+        std::cout << "No valid file metadata found.\nStore a file first.\n";
         return;
     }
 

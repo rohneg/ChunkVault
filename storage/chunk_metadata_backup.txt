@@ -1,0 +1,4 @@
+storage/chunks/chunk_1.chunk|storage/node1/chunk_1.chunk|storage/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+storage/chunks/chunk_2.chunk|storage/node1/chunk_2.chunk|storage/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
+storage/FILE_FSHV/chunks/chunk_1.chunk|storage/FILE_FSHV/node1/chunk_1.chunk|storage/FILE_FSHV/node2/chunk_1.chunk|3386b8bab4a17afd3cc3eca1b627f6c66f23d221769a9b7b1471bbb2455290a4
+storage/FILE_FSHV/chunks/chunk_2.chunk|storage/FILE_FSHV/node1/chunk_2.chunk|storage/FILE_FSHV/node2/chunk_2.chunk|cb4d36efe37c8d611479278c7260d2068b56ed3e49ac17bd8aedb6cb33086d9c
