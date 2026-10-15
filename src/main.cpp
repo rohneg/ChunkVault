@@ -272,14 +272,9 @@ metadataFile.close();
         metadata.chunkId = chunkId;
         metadata.chunkNumber = chunkNumber;
 
-        std::string chunkPath =
-            "storage/chunks/chunk_" + std::to_string(chunkNumber) + ".chunk";
-
-        std::string node1Path =
-            "storage/node1/chunk_" + std::to_string(chunkNumber) + ".chunk";
-
-        std::string node2Path =
-            "storage/node2/chunk_" + std::to_string(chunkNumber) + ".chunk";
+        std::string chunkPath =chunksDirectory + "/chunk_" + std::to_string(chunkNumber) + ".chunk";
+        std::string node1Path =node1Directory + "/chunk_" + std::to_string(chunkNumber) + ".chunk";
+        std::string node2Path =node2Directory + "/chunk_" + std::to_string(chunkNumber) + ".chunk";
 
         std::ofstream chunkOutput(chunkPath, std::ios::binary);
         std::ofstream node1Output(node1Path, std::ios::binary);
