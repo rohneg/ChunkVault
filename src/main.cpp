@@ -140,17 +140,12 @@ void verifyExistingChunks() {
     std::string node2Path;
     std::string expectedChecksum;
 
-    while (std::getline(metadataFile, chunkPath, '|') &&
-           std::getline(metadataFile, node1Path, '|') &&
-           std::getline(metadataFile, node2Path, '|') &&
-           std::getline(metadataFile, expectedChecksum)) {
+    while (std::getline(metadataFile, chunkPath, '|') && std::getline(metadataFile, node1Path, '|') &&
+           std::getline(metadataFile, node2Path, '|') && std::getline(metadataFile, expectedChecksum)) {
         std::cout << "\nChunk: " << chunkPath << '\n';
-        std::cout << "Main Chunk: "
-                  << checkChunkStatus(chunkPath, expectedChecksum) << '\n';
-        std::cout << "Node 1: "
-                  << checkChunkStatus(node1Path, expectedChecksum) << '\n';
-        std::cout << "Node 2: "
-                  << checkChunkStatus(node2Path, expectedChecksum) << '\n';
+        std::cout << "Main Chunk: "<< checkChunkStatus(chunkPath, expectedChecksum) << '\n';
+        std::cout << "Node 1: "<< checkChunkStatus(node1Path, expectedChecksum) << '\n';
+        std::cout << "Node 2: "<< checkChunkStatus(node2Path, expectedChecksum) << '\n';
     }
 }
 
@@ -251,14 +246,14 @@ int main() {
     fs::create_directories(node1Directory);
     fs::create_directories(node2Directory);
 
-
-    std::ofstream metadataFile("storage/chunk_metadata.txt",std::ios::trunc);
+    fs::create_directories("storage");
+    std::ofstream metadataFile("storage/chunk_metadata.txt", std::ios::app);
     if (!metadataFile) {
         std::cout << "Error: Unable to create metadata file.\n";
         return 1;
     }
 
-metadataFile.close();
+    metadataFile.close();
 
     char buffer[BUFFER_SIZE];
     uintmax_t bytesInChunk = 0;
