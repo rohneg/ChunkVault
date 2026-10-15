@@ -365,7 +365,7 @@ int main() {
     }
 
  
-    std::string fileStorage = "storage/" + fileId;
+    std::string fileStorage = "storage/" + path.filename().string() + " (" + fileId + ")";
 
     std::string chunksDirectory = fileStorage + "/chunks";
     std::string node1Directory = fileStorage + "/node1";
