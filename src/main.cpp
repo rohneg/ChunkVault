@@ -240,9 +240,17 @@ int main() {
         return 1;
     }
 
-    fs::create_directories("storage/chunks");
-    fs::create_directories("storage/node1");
-    fs::create_directories("storage/node2");
+ 
+    std::string fileStorage = "storage/" + fileId;
+
+    std::string chunksDirectory = fileStorage + "/chunks";
+    std::string node1Directory = fileStorage + "/node1";
+    std::string node2Directory = fileStorage + "/node2";
+
+    fs::create_directories(chunksDirectory);
+    fs::create_directories(node1Directory);
+    fs::create_directories(node2Directory);
+
 
     std::ofstream metadataFile("storage/chunk_metadata.txt",std::ios::trunc);
     if (!metadataFile) {
