@@ -7,6 +7,8 @@
 #include <random>
 #include <CommonCrypto/CommonDigest.h>
 #include <cstdio>
+#include <sstream>
+#include <vector>
 
 
 namespace fs = std::filesystem;
@@ -76,6 +78,15 @@ struct ChunkMetadata {
 
 };
 
+struct StoredChunk {
+    std::string fileId;
+    std::string fileName;
+    std::string chunkPath;
+    std::string node1Path;
+    std::string node2Path;
+    std::string checksum;
+};
+
 std::string calculateChecksum(const std::string& filePath) {
     std::ifstream file(filePath, std::ios::binary);
 
@@ -127,6 +138,7 @@ std::string checkChunkStatus(const std::string& filePath,
 }
 
 
+
 void verifyExistingChunks() {
     std::ifstream metadataFile("storage/chunk_metadata.txt");
 
@@ -135,19 +147,114 @@ void verifyExistingChunks() {
         return;
     }
 
-    std::string chunkPath;
-    std::string node1Path;
-    std::string node2Path;
-    std::string expectedChecksum;
+    std::vector<StoredChunk> chunks;
+    std::string line;
 
-    while (std::getline(metadataFile, chunkPath, '|') && std::getline(metadataFile, node1Path, '|') &&
-           std::getline(metadataFile, node2Path, '|') && std::getline(metadataFile, expectedChecksum)) {
-        std::cout << "\nChunk: " << chunkPath << '\n';
-        std::cout << "Main Chunk: "<< checkChunkStatus(chunkPath, expectedChecksum) << '\n';
-        std::cout << "Node 1: "<< checkChunkStatus(node1Path, expectedChecksum) << '\n';
-        std::cout << "Node 2: "<< checkChunkStatus(node2Path, expectedChecksum) << '\n';
+    while (std::getline(metadataFile, line)) {
+        std::stringstream record(line);
+        std::vector<std::string> fields;
+        std::string field;
+
+        while (std::getline(record, field, '|')) {
+            fields.push_back(field);
+        }
+
+        if (fields.size() != 6) {
+            continue;
+        }
+
+        StoredChunk chunk;
+        chunk.fileId = fields[0];
+        chunk.fileName = fields[1];
+        chunk.chunkPath = fields[2];
+        chunk.node1Path = fields[3];
+        chunk.node2Path = fields[4];
+        chunk.checksum = fields[5];
+
+        chunks.push_back(chunk);
     }
+
+    metadataFile.close();
+
+    if (chunks.empty()) {
+        std::cout << "No valid file metadata found. Store a file first.\n";
+        return;
+    }
+
+    std::vector<std::pair<std::string, std::string>> files;
+
+    for (const auto& chunk : chunks) {
+        bool found = false;
+
+        for (const auto& file : files) {
+            if (file.first == chunk.fileId) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            files.push_back({chunk.fileId, chunk.fileName});
+        }
+    }
+
+    std::cout << "\n===== Select File to Verify =====\n";
+
+    for (size_t i = 0; i < files.size(); i++) {
+        std::cout << i + 1 << ". " << files[i].second
+                  << " (" << files[i].first << ")\n";
+    }
+
+    std::cout << "0. Back\n";
+    std::cout << "Select file: ";
+
+    size_t selection;
+
+    if (!(std::cin >> selection)) {
+        std::cin.clear();
+        std::cin.ignore(10000, '\n');
+        std::cout << "Invalid selection.\n";
+        return;
+    }
+
+    std::cin.ignore(10000, '\n');
+
+    if (selection == 0) {
+        return;
+    }
+
+    if (selection > files.size()) {
+        std::cout << "Invalid selection.\n";
+        return;
+    }
+
+    const auto& selectedFile = files[selection - 1];
+
+    std::cout << "\n===== File Integrity Report =====\n";
+    std::cout << "File: " << selectedFile.second << '\n';
+    std::cout << "File ID: " << selectedFile.first << '\n';
+
+    int chunkNumber = 0;
+
+    for (const auto& chunk : chunks) {
+        if (chunk.fileId != selectedFile.first) {
+            continue;
+        }
+
+        chunkNumber++;
+
+        std::cout << "\nChunk " << chunkNumber << '\n';
+        std::cout << "Main Chunk: "
+                  << checkChunkStatus(chunk.chunkPath, chunk.checksum) << '\n';
+        std::cout << "Node 1: "
+                  << checkChunkStatus(chunk.node1Path, chunk.checksum) << '\n';
+        std::cout << "Node 2: "
+                  << checkChunkStatus(chunk.node2Path, chunk.checksum) << '\n';
+    }
+
+    std::cout << "\nTotal Chunks: " << chunkNumber << '\n';
 }
+
 
 int main() {
     int choice;
