@@ -158,19 +158,36 @@ void verifyExistingChunks() {
         while (std::getline(record, field, '|')) {
             fields.push_back(field);
         }
+        StoredChunk chunk;
 
-        if (fields.size() != 6) {
+        if (fields.size() == 6) {
+            chunk.fileId = fields[0];
+            chunk.fileName = fields[1];
+            chunk.chunkPath = fields[2];
+            chunk.node1Path = fields[3];
+            chunk.node2Path = fields[4];
+            chunk.checksum = fields[5];
+        }
+        else if (fields.size() == 4) {
+            chunk.chunkPath = fields[0];
+            chunk.node1Path = fields[1];
+            chunk.node2Path = fields[2];
+            chunk.checksum = fields[3];
+
+            fs::path chunkFilePath(chunk.chunkPath);
+            fs::path chunksDir = chunkFilePath.parent_path();
+            fs::path fileDir = chunksDir.parent_path();
+
+            if (chunksDir.filename() != "chunks" || fileDir.parent_path().filename() != "storage" ||
+                fileDir.filename() == "storage") {
+                    continue;
+            }
+            chunk.fileId = fileDir.filename().string();
+            chunk.fileName = chunk.fileId;
+        }
+        else {
             continue;
         }
-
-        StoredChunk chunk;
-        chunk.fileId = fields[0];
-        chunk.fileName = fields[1];
-        chunk.chunkPath = fields[2];
-        chunk.node1Path = fields[3];
-        chunk.node2Path = fields[4];
-        chunk.checksum = fields[5];
-
         chunks.push_back(chunk);
     }
 
@@ -427,7 +444,12 @@ int main() {
             std::cout << "Error: Unable to save metadata.\n";
             return 1;
         }
-        metadataFile << chunkPath << '|'<< node1Path << '|'<< node2Path << '|'<< metadata.checksum << '\n';
+        metadataFile << metadata.fileId << '|'
+             << path.filename().string() << '|'
+             << chunkPath << '|'
+             << node1Path << '|'
+             << node2Path << '|'
+             << metadata.checksum << '\n';
         metadataFile.close();
         
         std::cout << "\nChunk Metadata:\n";
