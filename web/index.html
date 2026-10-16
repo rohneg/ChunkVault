@@ -1,0 +1,55 @@
+ <escape><!DOCTYPE html></escape>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChunkVault | Storage & OS Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">C</div>
+                <div>
+                    <h2>ChunkVault</h2>
+                    <p>Storage & OS Simulator</p>
+                </div>
+            </div>
+
+            <p class="nav-label">WORKSPACE</p>
+
+            <nav id="navigation">
+                <button class="nav-item active" data-page="dashboard">Dashboard</button>
+                <button class="nav-item" data-page="storage">File Storage</button>
+                <button class="nav-item" data-page="scheduler">OS Simulator</button>
+                <button class="nav-item" data-page="deadlock">Deadlock Lab</button>
+                <button class="nav-item" data-page="integrity">Integrity & Recovery</button>
+                <button class="nav-item" data-page="database">Database & Logs</button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="status-dot"></span>
+                Backend integration pending
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">CHUNKVAULT / WORKSPACE</p>
+                    <h1 id="page-title">Dashboard</h1>
+                </div>
+                <div class="system-status">
+                    <span class="status-dot"></span>
+                    UI Preview
+                </div>
+            </header>
+
+            <section id="page-content"></section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
