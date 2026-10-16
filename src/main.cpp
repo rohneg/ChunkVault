@@ -10,7 +10,7 @@
 #include <sstream>
 #include <vector>
 #include "../database/Database.h"
-
+#include "os_simulator.h"
 
 namespace fs = std::filesystem;
 
