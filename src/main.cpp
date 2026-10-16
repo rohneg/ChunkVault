@@ -415,15 +415,31 @@ int main() {
         }
     }
 
-    std::cout << "\n1. Store a file\n";
+    std::cout << "\n===== ChunkVault =====\n";
+    std::cout << "1. Store a file\n";
     std::cout << "2. Verify existing chunks\n";
+    std::cout << "3. OS Simulator\n";
     std::cout << "Enter choice: ";
-    std::cin >> choice;
+
+    if (!(std::cin >> choice)) {
+        std::cin.clear();
+        std::cin.ignore(10000, '\n');
+        std::cout << "Invalid choice.\n";
+        return 1;
+    }
+
     std::cin.ignore(10000, '\n');
+
     if (choice == 2) {
         verifyExistingChunks();
         return 0;
     }
+
+    if (choice == 3) {
+        runOSSimulator();
+        return 0;
+    }
+
     if (choice != 1) {
         std::cout << "Invalid choice.\n";
         return 1;
