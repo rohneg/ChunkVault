@@ -569,10 +569,11 @@ async function loadStoredFiles(revision) {
         target.innerHTML = state.files.length
             ? '<div class="stored-file-actions"><button id="select-all-files" class="button-secondary" type="button">Select all</button>' +
                 '<button id="delete-selected-files" class="button-danger" type="button" disabled>Delete selected</button></div>' + groups
-            : emptyState("No files stored", "Choose one file above to start.", "database");
+            : emptyState("No file is present", "Upload a file to get started.", "database");
         const selectAll = document.getElementById("select-all-files");
         const bulkButton = document.getElementById("delete-selected-files");
         const updateBulkButton = function () {
+            if (!selectAll || !bulkButton) return;
             const selected = document.querySelectorAll(".storage-delete-checkbox:checked").length;
             selectAll.disabled = state.files.length === 0 || state.storageDeleting;
             bulkButton.disabled = selected === 0 || state.storageDeleting;
