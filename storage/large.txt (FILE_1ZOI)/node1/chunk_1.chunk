@@ -10,8 +10,4 @@ Replication provides additional copies of stored data. ChunkVault creates replic
 
 Large files provide useful test cases for evaluating buffered file operations. Reading and writing data in buffers avoids loading an entire large file into memory at once. The system can read a portion of the input file, write that portion to a chunk, and repeat the operation until all bytes have been processed. Correct handling of the final partial buffer is necessary to avoid losing or adding bytes.
 
-Adaptive chunking selects a chunk size based on the input file size and the system's configured limits. The goal is to balance the number of chunks, metadata overhead, storage operations, and memory usage. A suitable chunk size depends on the design of the storage system and should be evaluated using actual performance measurements.
-
-When multiple files are stored, each file must be identified independently. The storage system must not overwrite chunks belonging to another file. Metadata must preserve the relationship between the original file, its chunks, checksum values, and replica locations. Verification should report which file and which chunk has a problem.
-
-Operating System scheduling can help organize multiple file-processing requests. First Come, First Served processes jobs in arrival order, while Shortest Job First selects the job with the shortest estimated processing time. These algorithms can be compared by measuring waiting time, turnaround time, and actual execution tim
+Adaptive

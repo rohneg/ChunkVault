@@ -11,6 +11,7 @@
 #include <vector>
 #include "../database/Database.h"
 #include "os_simulator.h"
+#include "web_server.h"
 
 namespace fs = std::filesystem;
 
@@ -397,7 +398,25 @@ for (const auto& entry : fs::directory_iterator("storage")) {
 }
 
 
-int main() {
+int main(int argc, char* argv[]) {
+
+    if (argc > 1 && std::string(argv[1]) == "--server") {
+        unsigned short port = 8080;
+        if (argc > 2) {
+            try {
+                unsigned long parsedPort = std::stoul(argv[2]);
+                if (parsedPort == 0 || parsedPort > 65535) {
+                    std::cerr << "Port must be between 1 and 65535.\n";
+                    return 1;
+                }
+                port = static_cast<unsigned short>(parsedPort);
+            } catch (...) {
+                std::cerr << "Invalid port number.\n";
+                return 1;
+            }
+        }
+        return runWebServer(port);
+    }
 
     int choice;
 

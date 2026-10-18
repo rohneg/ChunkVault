@@ -1,2 +1,7 @@
 .DS_Store
-**/.DS_Store
+
+/chunkvault-web
+/chunkvault-web-os
+/database_test
+/mysql_test
+*.o

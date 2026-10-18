@@ -1,10 +1,4 @@
-e. Scheduling must not alter the original order of chunks used for reconstruction.
-
-Database integration can provide persistent metadata management. Tables can store file records, chunk records, checksums, storage locations, replica information, and processing status. Transactions can help ensure that metadata changes are committed consistently when an operation succeeds or rolled back when an operation fails.
-
-Testing should cover files of different sizes, valid and invalid input paths, missing chunks, corrupted chunks, healthy and damaged replicas, multiple-file storage, and original-file reconstruction. The reconstructed output should be compared byte by byte with the original file to establish whether the process preserved the data correctly.
-
-The purpose of this large-scale test is to examine the behavior of the storage system under different workloads. The number of generated chunks, processing duration, integrity verification results, and replica status should be recorded during testing. Performance conclusions should be based on measured results rather than assumptions.
+ded during testing. Performance conclusions should be based on measured results rather than assumptions.
 
 CHUNKVAULT TEST RECORD 001
 
