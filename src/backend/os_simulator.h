@@ -50,24 +50,16 @@ struct ResourceActionResult {
     std::string message;
 };
 
-bool calculateSchedule(const std::vector<Process>& processes,
-                       const std::string& algorithm,
-                       int quantum,
-                       ScheduleResult& result,
-                       std::string& error);
+bool calculateSchedule(const std::vector<Process>& processes, const std::string& algorithm,
+                       int quantum, ScheduleResult& result, std::string& error);
 
 std::vector<int> detectDeadlockCycle(const std::vector<int>& processIds,
                                      const std::vector<OSResource>& resources,
                                      const std::vector<OSResourceRequest>& requests);
 
-bool applyResourceAction(const std::vector<int>& processIds,
-                         const std::vector<OSResource>& resources,
-                         const std::vector<OSResourceRequest>& requests,
-                         const std::string& action,
-                         int pid,
-                         int resourceId,
-                         ResourceActionResult& result,
-                         std::string& error);
+bool applyResourceAction(const std::vector<int>& processIds, const std::vector<OSResource>& resources,
+                         const std::vector<OSResourceRequest>& requests, const std::string& action,
+                         int pid, int resourceId, ResourceActionResult& result, std::string& error);
 
 void runOSSimulator();
 
