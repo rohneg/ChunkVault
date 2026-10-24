@@ -382,6 +382,8 @@ function decodeContent(hex) {
     return { format: "Text", text };
 }
 
+const PLAYABLE = new Set(["video/mp4", "video/webm", "video/quicktime", "audio/mpeg", "audio/ogg", "audio/wav", "audio/flac", "audio/mp4"]);
+
 async function viewFile(file) {
     const type = file.type || "";
     const url = `/api/files/${encodeURIComponent(file.id)}/download?inline=1`;
@@ -390,10 +392,13 @@ async function viewFile(file) {
     $("vcontent").textContent = "";
     $("vcontent").hidden = false;
     $("viewer").showModal();
-    if (/^image\/(png|jpeg|gif|webp|bmp)$/.test(type) || type === "application/pdf") {
+    const player = PLAYABLE.has(type) ? (type.startsWith("video/") ? "video" : "audio") : "";
+    if (player || /^image\/(png|jpeg|gif|webp|bmp)$/.test(type) || type === "application/pdf") {
         $("vstatus").textContent = type;
         $("vcontent").hidden = true;
-        $("vmedia").innerHTML = type === "application/pdf"
+        $("vmedia").innerHTML = player
+            ? `<${player} controls preload="metadata" src="${url}" onerror="this.replaceWith('This browser cannot play this file. Use Download instead.')"></${player}>`
+            : type === "application/pdf"
             ? `<iframe src="${url}" title="${esc(file.name)}"></iframe>`
             : `<img src="${url}" alt="${esc(file.name)}" onerror="this.replaceWith('Could not load the image. Run Replicate and try again.')">`;
         return;
