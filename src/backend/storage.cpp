@@ -3,11 +3,14 @@
 #include <CommonCrypto/CommonDigest.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <random>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -20,6 +23,17 @@ std::uintmax_t autoChunkSize(std::uintmax_t fileSize) {
     const double baseChunk = 256.0 * 1024 * 1024, baseFile = 1024.0 * 1024 * 1024;
     auto size = static_cast<std::uintmax_t>(baseChunk * std::pow(static_cast<double>(fileSize) / baseFile, 0.65));
     return std::min({std::max(size, minimum), maximum, fileSize});
+}
+
+std::string toHex(const unsigned char* bytes, std::size_t count) {
+    static const char hex[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(count * 2);
+    for (std::size_t i = 0; i < count; ++i) {
+        out += hex[bytes[i] >> 4];
+        out += hex[bytes[i] & 15];
+    }
+    return out;
 }
 
 }
@@ -44,14 +58,62 @@ std::string checksum(const fs::path& path) {
     }
     unsigned char digest[CC_SHA256_DIGEST_LENGTH];
     CC_SHA256_Final(digest, &context);
+    return toHex(digest, CC_SHA256_DIGEST_LENGTH);
+}
 
-    static const char hex[] = "0123456789abcdef";
-    std::string out;
-    for (unsigned char byte : digest) {
-        out += hex[byte >> 4];
-        out += hex[byte & 15];
+std::string detectMime(const fs::path& path, const std::string& name) {
+    std::ifstream input(path, std::ios::binary);
+    char head[512];
+    input.read(head, sizeof(head));
+    const size_t size = static_cast<size_t>(input.gcount());
+
+    auto at = [&](size_t offset, const std::string& magic) {
+        return size >= offset + magic.size() && std::memcmp(head + offset, magic.data(), magic.size()) == 0;
+    };
+    std::string ext = fs::path(name).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    if (at(0, "\x89PNG")) return "image/png";
+    if (at(0, "\xFF\xD8\xFF")) return "image/jpeg";
+    if (at(0, "GIF8")) return "image/gif";
+    if (at(0, "RIFF") && at(8, "WEBP")) return "image/webp";
+    if (at(0, "RIFF") && at(8, "WAVE")) return "audio/wav";
+    if (at(0, "%PDF")) return "application/pdf";
+    if (at(0, "OggS")) return "audio/ogg";
+    if (at(0, "fLaC")) return "audio/flac";
+    if (at(0, "ID3")) return "audio/mpeg";
+    if (at(4, "ftyp")) return "video/mp4";
+    if (at(0, "\x1f\x8b")) return "application/gzip";
+    if (at(0, "Rar!")) return "application/vnd.rar";
+    if (at(0, "7z\xBC\xAF")) return "application/x-7z-compressed";
+    if (at(0, "SQLite format 3")) return "application/vnd.sqlite3";
+    if (at(0, "BM") && ext == ".bmp") return "image/bmp";
+    if (ext == ".mp3" && size >= 2 && static_cast<unsigned char>(head[0]) == 0xFF &&
+        (static_cast<unsigned char>(head[1]) & 0xE0) == 0xE0) return "audio/mpeg";
+    if (at(0, "PK\x03\x04")) {
+        static const std::unordered_map<std::string, const char*> office = {
+            {".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+            {".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+            {".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"}};
+        const auto found = office.find(ext);
+        return found == office.end() ? "application/zip" : found->second;
     }
-    return out;
+
+    size_t control = 0;
+    bool text = size > 0;
+    for (size_t i = 0; i < size && text; ++i) {
+        const auto byte = static_cast<unsigned char>(head[i]);
+        if (byte == 0) text = false;
+        else if (byte < 9 || (byte > 13 && byte < 32)) ++control;
+    }
+    if (!text || control * 50 > size) return "application/octet-stream";
+
+    static const std::unordered_map<std::string, const char*> textTypes = {
+        {".json", "application/json"}, {".xml", "application/xml"}, {".html", "text/html"}, {".htm", "text/html"},
+        {".css", "text/css"}, {".js", "text/javascript"}, {".csv", "text/csv"}, {".md", "text/markdown"},
+        {".svg", "image/svg+xml"}};
+    const auto found = textTypes.find(ext);
+    return found == textTypes.end() ? "text/plain" : found->second;
 }
 
 std::string status(const std::string& path, const std::string& expectedChecksum) {
@@ -97,13 +159,18 @@ StoreResult storeFile(Database& database, const fs::path& source, const std::str
 
     StoreResult result;
     result.size = size;
+    result.sha256 = checksum(source);
+    if (result.sha256.empty()) throw std::runtime_error("Unable to read the uploaded file.");
+    result.mimeType = detectMime(source, name);
+
     fs::path directory;
     bool inserted = false;
     for (int attempt = 0; attempt < 20 && !inserted; ++attempt) {
         result.id = randomId("FILE_", 4);
         directory = fs::path("storage") / (name + " (" + result.id + ")");
         inserted = !fs::exists(directory) &&
-                   database.insertFile(result.id, name, size, static_cast<unsigned int>(total));
+                   database.insertFile(result.id, name, size, static_cast<unsigned int>(total),
+                                       result.mimeType, result.sha256);
     }
     if (!inserted) throw std::runtime_error("MySQL did not save the file metadata; no storage job was started.");
 
@@ -157,6 +224,40 @@ StoreResult storeFile(Database& database, const fs::path& source, const std::str
 
     result.logged = database.logActivity("STORAGE", name + " (" + result.id + ") stored with " +
                                                      std::to_string(total) + " chunk(s).");
+    return result;
+}
+
+RestoreResult reconstruct(const std::vector<ChunkRecord>& chunks,
+                          const std::function<bool(const char*, std::size_t)>& sink) {
+    RestoreResult result;
+    CC_SHA256_CTX context;
+    CC_SHA256_Init(&context);
+    std::vector<char> buffer(1 << 20);
+
+    for (const auto& chunk : chunks) {
+        const auto paths = locations(chunk);
+        int source = -1;
+        for (int i = 0; i < 3 && source < 0; ++i) {
+            if (status(paths[static_cast<size_t>(i)], chunk.checksum) == "HEALTHY") source = i;
+        }
+        if (source < 0) {
+            throw std::runtime_error("Chunk " + std::to_string(chunk.chunkNumber) +
+                                     " has no healthy copy. Run Replicate first.");
+        }
+        if (source > 0) result.repaired += recover(chunk);
+
+        std::ifstream input(paths[static_cast<size_t>(source)], std::ios::binary);
+        if (!input) throw std::runtime_error("Unable to read chunk " + std::to_string(chunk.chunkNumber) + ".");
+        while (input.read(buffer.data(), static_cast<std::streamsize>(buffer.size())) || input.gcount() > 0) {
+            const auto got = static_cast<std::size_t>(input.gcount());
+            CC_SHA256_Update(&context, buffer.data(), static_cast<CC_LONG>(got));
+            if (!sink(buffer.data(), got)) throw std::runtime_error("The output was closed before the file was complete.");
+        }
+    }
+
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256_Final(digest, &context);
+    result.sha256 = toHex(digest, CC_SHA256_DIGEST_LENGTH);
     return result;
 }
 

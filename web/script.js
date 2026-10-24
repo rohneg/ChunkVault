@@ -56,8 +56,14 @@ async function api(path, options = {}) {
 
 const post = (path, params) => api(path, { method: "POST", body: new URLSearchParams(params) });
 
-const fileTable = (files) => table(["File", "ID", "Size", "Chunks"],
-    files.map((f) => [esc(f.name), `<span class="mono">${esc(f.id)}</span>`, fmtSize(f.size), f.chunkCount]), "No files stored yet.");
+const mono = (value) => `<span class="mono">${esc(value)}</span>`;
+const shortHash = (hash) => (hash ? `<span class="mono" title="${esc(hash)}">${esc(hash.slice(0, 12))}…</span>` : "—");
+const downloadLink = (f) => `<a class="button" href="/api/files/${encodeURIComponent(f.id)}/download" download>Download</a>`;
+
+const fileTable = (files, withHash = false) => table(
+    ["File", "ID", "Type", "Size", "Chunks", ...(withHash ? ["SHA-256"] : [])],
+    files.map((f) => [esc(f.name), mono(f.id), mono(f.type), fmtSize(f.size), f.chunkCount, ...(withHash ? [shortHash(f.sha256)] : [])]),
+    "No files stored yet.");
 
 const activityTable = (items, selectable = false) => table(
     [...(selectable ? [""] : []), "Action", "Details", "Time"],
@@ -137,9 +143,9 @@ async function loadFiles(t) {
     state.files = files;
     $("filecount").textContent = files.length;
     box.innerHTML = files.length
-        ? bulkBar + table(["", "File", "ID", "Size", "Chunks"], files.map((f) => [
+        ? bulkBar + table(["", "File", "ID", "Type", "Size", "Chunks", ""], files.map((f) => [
             `<input type="checkbox" class="pick" value="${esc(f.id)}" aria-label="Select ${esc(f.name)}">`,
-            esc(f.name), `<span class="mono">${esc(f.id)}</span>`, fmtSize(f.size), f.chunkCount]))
+            esc(f.name), mono(f.id), mono(f.type), fmtSize(f.size), f.chunkCount, downloadLink(f)]))
         : empty("No files stored yet.");
     wireBulk(box, async (ids) => {
         await deleteEach(ids, "/api/files/");
@@ -178,7 +184,7 @@ async function storagePage(t) {
         result.innerHTML = note("Storing… keep this page open until it finishes.");
         try {
             const r = await upload(chosen, mode.value, n, (percent) => { bar.value = percent; });
-            result.innerHTML = note(`${r.name} stored · ${r.chunkCount} chunk(s) · ${r.id}`, "success");
+            result.innerHTML = note(`${r.name} (${r.type}) stored · ${r.chunkCount} chunk(s) · ${r.id}`, "success");
             file.value = "";
             await loadFiles(t);
         } catch (e) {
@@ -377,11 +383,22 @@ function decodeContent(hex) {
 }
 
 async function viewFile(file) {
-    const dialog = $("viewer");
+    const type = file.type || "";
+    const url = `/api/files/${encodeURIComponent(file.id)}/download?inline=1`;
     $("vtitle").textContent = file.name;
-    $("vstatus").textContent = "Loading from stored chunks…";
+    $("vmedia").innerHTML = "";
     $("vcontent").textContent = "";
-    dialog.showModal();
+    $("vcontent").hidden = false;
+    $("viewer").showModal();
+    if (/^image\/(png|jpeg|gif|webp|bmp)$/.test(type) || type === "application/pdf") {
+        $("vstatus").textContent = type;
+        $("vcontent").hidden = true;
+        $("vmedia").innerHTML = type === "application/pdf"
+            ? `<iframe src="${url}" title="${esc(file.name)}"></iframe>`
+            : `<img src="${url}" alt="${esc(file.name)}" onerror="this.replaceWith('Could not load the image. Run Replicate and try again.')">`;
+        return;
+    }
+    $("vstatus").textContent = "Loading from stored chunks…";
     try {
         const d = await api(`/api/files/${encodeURIComponent(file.id)}/content`);
         const view = decodeContent(d.contentHex || "");
@@ -400,8 +417,9 @@ async function integrityPage(t) {
     main.innerHTML = `
         <div id="intmsg"></div>
         <div class="card"><h2>Files, chunks and replicas</h2><div id="summary"></div><div id="report"></div></div>
-        <dialog id="viewer"><h3 id="vtitle"></h3><p id="vstatus" class="muted"></p><pre id="vcontent"></pre><button id="vclose">Close</button></dialog>`;
+        <dialog id="viewer"><h3 id="vtitle"></h3><p id="vstatus" class="muted"></p><div id="vmedia"></div><pre id="vcontent"></pre><button id="vclose">Close</button></dialog>`;
     $("vclose").onclick = () => $("viewer").close();
+    $("viewer").onclose = () => { $("vmedia").innerHTML = ""; };
 
     const draw = () => {
         const statuses = chunks.flatMap((c) => [c.main.status, c.node1.status, c.node2.status]);
@@ -410,8 +428,8 @@ async function integrityPage(t) {
         $("report").innerHTML = state.files.length ? state.files.map((f) => {
             const own = chunks.filter((c) => c.fileId === f.id);
             const button = (act, label) => `<button data-act="${act}" data-id="${esc(f.id)}">${label}</button>`;
-            return `<div class="file"><div class="row"><b>${esc(f.name)}</b><span class="muted mono">${esc(f.id)} · ${fmtSize(f.size)} · ${own.length} chunk(s)</span>` +
-                `<span class="spacer"></span>${button("view", "View")}${button("verify", "Verify")}${button("recover", "Replicate")}</div>` +
+            return `<div class="file"><div class="row"><b>${esc(f.name)}</b><span class="muted mono">${esc(f.type)} · ${esc(f.id)} · ${fmtSize(f.size)} · ${own.length} chunk(s)</span>` +
+                `<span class="spacer"></span>${button("view", "View")}${downloadLink(f)}${button("verify", "Verify")}${button("recover", "Replicate")}</div>` +
                 table(["Chunk", "Size", "Main", "Node 1", "Node 2"], own.map((c) => [c.number, fmtSize(c.size), badge(c.main.status), badge(c.node1.status), badge(c.node2.status)]), "No chunk records for this file.") + "</div>";
         }).join("") : empty("No files stored yet.");
     };
@@ -444,10 +462,9 @@ async function integrityPage(t) {
 async function databasePage(t) {
     const d = await api("/api/database");
     if (t !== token) return;
-    const mono = (v) => `<span class="mono">${esc(v)}</span>`;
     const copy = (c) => `${esc(safePath(c.path))}<br>${badge(c.status)}`;
     main.innerHTML =
-        `<div class="card"><h2>Files <span class="muted">${d.files.length}</span></h2>${fileTable(d.files)}</div>` +
+        `<div class="card"><h2>Files <span class="muted">${d.files.length}</span></h2>${fileTable(d.files, true)}</div>` +
         `<div class="card"><h2>Chunks and replicas <span class="muted">${d.chunks.length}</span></h2>` +
         table(["Chunk", "File", "#", "Size", "SHA-256", "Main", "Node 1", "Node 2"], d.chunks.map((c) => [
             mono(c.id), mono(c.fileId), c.number, fmtSize(c.size),

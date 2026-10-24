@@ -1,5 +1,4 @@
 #include "http.h"
-#include "json.h"
 
 #include <algorithm>
 #include <array>
@@ -64,6 +63,21 @@ std::string urlDecode(const std::string& value) {
             i += 2;
         } else {
             out += value[i];
+        }
+    }
+    return out;
+}
+
+std::string urlEncode(const std::string& value) {
+    static const char hex[] = "0123456789ABCDEF";
+    std::string out;
+    for (unsigned char c : value) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out += static_cast<char>(c);
+        } else {
+            out += '%';
+            out += hex[c >> 4];
+            out += hex[c & 15];
         }
     }
     return out;
@@ -157,11 +171,18 @@ bool streamBodyToFile(int socket, const HttpRequest& request, const fs::path& pa
     return true;
 }
 
-void respond(int socket, int status, const std::string& contentType, const std::string& body) {
+bool sendBytes(int socket, const char* data, size_t size) { return sendAll(socket, data, size); }
+
+bool sendHead(int socket, int status, const std::string& contentType, unsigned long long length,
+              const std::string& extraHeaders) {
     const std::string head = "HTTP/1.1 " + std::to_string(status) + ' ' + reason(status) +
-        "\r\nContent-Type: " + contentType + "\r\nContent-Length: " + std::to_string(body.size()) +
-        "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
-    if (sendAll(socket, head.data(), head.size())) sendAll(socket, body.data(), body.size());
+        "\r\nContent-Type: " + contentType + "\r\nContent-Length: " + std::to_string(length) +
+        "\r\nCache-Control: no-store\r\nConnection: close\r\n" + extraHeaders + "\r\n";
+    return sendAll(socket, head.data(), head.size());
+}
+
+void respond(int socket, int status, const std::string& contentType, const std::string& body) {
+    if (sendHead(socket, status, contentType, body.size())) sendAll(socket, body.data(), body.size());
 }
 
 void respondJson(int socket, int status, const std::string& body) {

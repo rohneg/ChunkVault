@@ -1,7 +1,5 @@
-#include "web_server.h"
 #include "../../database/Database.h"
 #include "http.h"
-#include "json.h"
 #include "os_simulator.h"
 #include "storage.h"
 
@@ -151,7 +149,8 @@ std::string chunksJson(const std::vector<ChunkRecord>& chunks) { return jsonArra
 std::string filesJson(const std::vector<FileRecord>& files) {
     return jsonArray(files, [](const FileRecord& f) {
         return "{\"id\":" + quote(f.fileId) + ",\"name\":" + quote(f.fileName) +
-               ",\"size\":" + to_string(f.originalSize) + ",\"chunkCount\":" + to_string(f.chunkCount) + "}";
+               ",\"size\":" + to_string(f.originalSize) + ",\"chunkCount\":" + to_string(f.chunkCount) +
+               ",\"type\":" + quote(f.mimeType) + ",\"sha256\":" + quote(f.fileSha256) + "}";
     });
 }
 
@@ -293,6 +292,7 @@ std::string fileContentJson(Database& database, const std::string& id) {
 
 std::string storeJson(const storage::StoreResult& result, const std::string& name) {
     return "{\"id\":" + quote(result.id) + ",\"name\":" + quote(name) + ",\"size\":" + to_string(result.size) +
+           ",\"type\":" + quote(result.mimeType) + ",\"sha256\":" + quote(result.sha256) +
            ",\"chunkCount\":" + to_string(result.chunks.size()) +
            ",\"activityLogged\":" + (result.logged ? "true" : "false") +
            ",\"chunks\":" + jsonArray(result.chunks, [](const ChunkRecord& c) {
@@ -329,6 +329,52 @@ void handleUpload(int socket, HttpRequest& request) {
     respondJson(socket, 201, storeJson(storage::storeFile(database, upload.path, filename, chunkCount), filename));
 }
 
+std::string asciiName(const std::string& name) {
+    std::string out;
+    for (unsigned char c : name) out += (c < 0x20 || c > 0x7E || c == '"' || c == '\\') ? '_' : static_cast<char>(c);
+    return out;
+}
+
+void handleDownload(int socket, Database& database, const std::string& id, bool inlineView) {
+    static const std::unordered_set<std::string> previewable = {
+        "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "application/pdf"};
+
+    FileRecord file;
+    if (!database.getFile(id, file)) throw std::invalid_argument("The selected file does not exist.");
+    const auto chunks = loadChunks(database, id);
+    if (inlineView && !previewable.count(file.mimeType)) {
+        throw std::invalid_argument("This file type cannot be previewed in the browser.");
+    }
+
+    std::string headers = "X-Content-Type-Options: nosniff\r\n";
+    if (!file.fileSha256.empty()) headers += "X-Content-SHA256: " + file.fileSha256 + "\r\n";
+    if (inlineView) {
+        headers += "Content-Disposition: inline\r\n";
+        if (file.mimeType != "application/pdf") headers += "Content-Security-Policy: sandbox\r\n";
+    } else {
+        headers += "Content-Disposition: attachment; filename=\"" + asciiName(file.fileName) +
+                   "\"; filename*=UTF-8''" + urlEncode(file.fileName) + "\r\n";
+    }
+
+    bool started = false;
+    storage::RestoreResult result;
+    try {
+        result = storage::reconstruct(chunks, [&](const char* data, size_t size) -> bool {
+            if (!started) {
+                started = true;
+                if (!sendHead(socket, 200, file.mimeType, file.originalSize, headers)) return false;
+            }
+            return sendBytes(socket, data, size);
+        });
+    } catch (...) {
+        if (started) return;
+        throw;
+    }
+    if (result.repaired > 0) {
+        database.logActivity("RECOVERY", id + ": restored " + to_string(result.repaired) + " copy/copies.");
+    }
+}
+
 void handleFileRoute(int socket, const HttpRequest& request, const std::string& suffix) {
     const size_t slash = suffix.find('/');
     const std::string id = suffix.substr(0, slash);
@@ -346,6 +392,7 @@ void handleFileRoute(int socket, const HttpRequest& request, const std::string& 
     if (m == "POST" && action == "verify") return respondJson(socket, 200, verifyFile(database, id));
     if (m == "POST" && action == "recover") return respondJson(socket, 200, recoverFile(database, id));
     if (m == "GET" && action == "content") return respondJson(socket, 200, fileContentJson(database, id));
+    if (m == "GET" && action == "download") return handleDownload(socket, database, id, parseForm(request.query)["inline"] == "1");
     respondError(socket, 404, "API endpoint not found.");
 }
 

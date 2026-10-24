@@ -13,46 +13,21 @@
     box-sizing: border-box; 
 }
 body { 
-    margin: 0; 
-    background: var(--bg); 
-    color: var(--ink); 
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; 
+    margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; 
 }
 
-header { 
-    position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 10px 24px; background: var(--card); border-bottom: 1px solid var(--line); 
-}
-header h1 { 
-    margin: 0; font-size: 17px; 
-}
-nav { 
-    display: flex; flex-wrap: wrap; gap: 4px; 
-}
-nav button { 
-    border-color: transparent; background: none; 
-}
-nav button.active { 
-    background: var(--accent); color: #fff; 
-}
+header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 10px 24px; background: var(--card); border-bottom: 1px solid var(--line); }
+header h1 { margin: 0; font-size: 17px; }
+nav { display: flex; flex-wrap: wrap; gap: 4px; }
+nav button { border-color: transparent; background: none; }
+nav button.active { background: var(--accent); color: #fff; }
 
-main { 
-    max-width: 1000px; margin: 24px auto; padding: 0 16px; 
-}
-.card { 
-    margin-bottom: 16px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; 
-}
-.card h2 { 
-    display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 15px; 
-}
-.stats { 
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; 
-}
-.stats .card { 
-    margin: 0; 
-}
-.stats b { 
-    display: block; font-size: 24px; 
-}
+main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+.card { margin-bottom: 16px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.card h2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 15px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stats .card { margin: 0; }
+.stats b { display: block; font-size: 24px; }
 
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; vertical-align: top; }
@@ -63,6 +38,8 @@ tr:last-child td { border-bottom: 0; }
 button, input, select { font: inherit; color: var(--ink); }
 button { padding: 6px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--accent); }
+a.button { display: inline-block; padding: 6px 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; text-decoration: none; }
+a.button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.danger { color: var(--bad); }
 button:disabled { opacity: .5; cursor: not-allowed; }
@@ -86,11 +63,7 @@ input, select { padding: 6px 8px; background: var(--card); border: 1px solid var
 .file { margin-top: 16px; }
 progress { width: 100%; }
 
-.gantt { 
-    display: flex; 
-    gap: 2px; overflow-x: auto; 
-    margin: 12px 0; 
-}
+.gantt { display: flex; gap: 2px; overflow-x: auto; margin: 12px 0; }
 .gantt div { padding: 6px 8px; background: var(--accent); color: #fff; border-radius: 4px; font-size: 12px; }
 .gantt div.idle { background: var(--line); color: var(--muted); }
 svg.graph { width: 100%; max-height: 460px; margin-top: 12px; color: var(--muted); }
@@ -104,6 +77,8 @@ svg.graph { width: 100%; max-height: 460px; margin-top: 12px; color: var(--muted
 
 dialog { width: min(760px, 94vw); background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
 dialog pre { max-height: 60vh; overflow: auto; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+dialog img { display: block; max-width: 100%; max-height: 70vh; margin: 8px auto; }
+dialog iframe { width: 100%; height: 70vh; border: 1px solid var(--line); border-radius: 6px; }
 dialog::backdrop { background: rgb(0 0 0 / 50%); }
 
 #toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; width: min(340px, calc(100vw - 32px)); }
