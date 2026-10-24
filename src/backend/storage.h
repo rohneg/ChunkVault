@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -42,7 +43,9 @@ StoreResult storeFile(Database& database, const std::filesystem::path& source,
                       const std::string& name, std::uintmax_t chunkCount = 0);
 
 RestoreResult reconstruct(const std::vector<ChunkRecord>& chunks,
-                          const std::function<bool(const char*, std::size_t)>& sink);
+                          const std::function<bool(const char*, std::size_t)>& sink,
+                          std::uint64_t offset = 0,
+                          std::uint64_t length = std::numeric_limits<std::uint64_t>::max());
 
 }
 

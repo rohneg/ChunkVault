@@ -16,6 +16,7 @@
 #include <unordered_set>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -25,6 +26,7 @@ namespace {
 
 constexpr int kMaxInt = std::numeric_limits<int>::max();
 constexpr size_t kFormLimit = 524288;
+constexpr unsigned long long kMaxInlineRange = 2ULL * 1024 * 1024;
 
 std::string allowedOrigin;
 
@@ -335,9 +337,11 @@ std::string asciiName(const std::string& name) {
     return out;
 }
 
-void handleDownload(int socket, Database& database, const std::string& id, bool inlineView) {
+void handleDownload(int socket, Database& database, const std::string& id, bool inlineView,
+                    const std::string& rangeHeader) {
     static const std::unordered_set<std::string> previewable = {
-        "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "application/pdf"};
+        "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "application/pdf",
+        "video/mp4", "video/webm", "video/quicktime", "audio/mpeg", "audio/ogg", "audio/wav", "audio/flac", "audio/mp4"};
 
     FileRecord file;
     if (!database.getFile(id, file)) throw std::invalid_argument("The selected file does not exist.");
@@ -346,8 +350,7 @@ void handleDownload(int socket, Database& database, const std::string& id, bool 
         throw std::invalid_argument("This file type cannot be previewed in the browser.");
     }
 
-    std::string headers = "X-Content-Type-Options: nosniff\r\n";
-    if (!file.fileSha256.empty()) headers += "X-Content-SHA256: " + file.fileSha256 + "\r\n";
+    std::string headers = "X-Content-Type-Options: nosniff\r\nAccept-Ranges: bytes\r\n";
     if (inlineView) {
         headers += "Content-Disposition: inline\r\n";
         if (file.mimeType != "application/pdf") headers += "Content-Security-Policy: sandbox\r\n";
@@ -356,16 +359,36 @@ void handleDownload(int socket, Database& database, const std::string& id, bool 
                    "\"; filename*=UTF-8''" + urlEncode(file.fileName) + "\r\n";
     }
 
+    const unsigned long long size = file.originalSize;
+    unsigned long long start = 0, end = size - 1;
+    int status = 200;
+    switch (parseByteRange(rangeHeader, size, start, end)) {
+        case RangeResult::Unsatisfiable:
+            return respond(socket, 416, "application/json; charset=utf-8",
+                           "{\"error\":\"Requested range not satisfiable.\"}",
+                           "Content-Range: bytes */" + to_string(size) + "\r\n");
+        case RangeResult::Partial:
+            status = 206;
+            if (inlineView) end = std::min(end, start + kMaxInlineRange - 1);
+            headers += "Content-Range: bytes " + to_string(start) + "-" + to_string(end) + "/" + to_string(size) + "\r\n";
+            break;
+        case RangeResult::Full:
+            if (!file.fileSha256.empty()) headers += "X-Content-SHA256: " + file.fileSha256 + "\r\n";
+            break;
+    }
+
     bool started = false;
     storage::RestoreResult result;
     try {
-        result = storage::reconstruct(chunks, [&](const char* data, size_t size) -> bool {
+        auto sink = [&](const char* data, size_t length) -> bool {
             if (!started) {
                 started = true;
-                if (!sendHead(socket, 200, file.mimeType, file.originalSize, headers)) return false;
+                if (!sendHead(socket, status, file.mimeType, end - start + 1, headers)) return false;
             }
-            return sendBytes(socket, data, size);
-        });
+            return sendBytes(socket, data, length);
+        };
+        result = status == 206 ? storage::reconstruct(chunks, sink, start, end - start + 1)
+                               : storage::reconstruct(chunks, sink);
     } catch (...) {
         if (started) return;
         throw;
@@ -392,7 +415,7 @@ void handleFileRoute(int socket, const HttpRequest& request, const std::string& 
     if (m == "POST" && action == "verify") return respondJson(socket, 200, verifyFile(database, id));
     if (m == "POST" && action == "recover") return respondJson(socket, 200, recoverFile(database, id));
     if (m == "GET" && action == "content") return respondJson(socket, 200, fileContentJson(database, id));
-    if (m == "GET" && action == "download") return handleDownload(socket, database, id, parseForm(request.query)["inline"] == "1");
+    if (m == "GET" && action == "download") return handleDownload(socket, database, id, parseForm(request.query)["inline"] == "1", request.header("range"));
     respondError(socket, 404, "API endpoint not found.");
 }
 
@@ -549,6 +572,8 @@ int runWebServer(unsigned short port) {
             if (errno != EINTR) std::cerr << "Unable to accept a web request.\n";
             continue;
         }
+        const timeval sendTimeout{15, 0};
+        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, sizeof(sendTimeout));
         handleConnection(client);
         shutdown(client, SHUT_RDWR);
         close(client);

@@ -1,6 +1,5 @@
 #ifndef CHUNKVAULT_HTTP_H
 #define CHUNKVAULT_HTTP_H
-
 #include <cstddef>
 #include <cstdio>
 #include <filesystem>
@@ -19,7 +18,6 @@ struct HttpRequest {
         return found == headers.end() ? "" : found->second;
     }
 };
-
 std::string urlDecode(const std::string& value);
 std::string urlEncode(const std::string& value);
 Form parseForm(const std::string& text);
@@ -28,13 +26,18 @@ bool readRequest(int socket, HttpRequest& request);
 bool receiveBody(int socket, HttpRequest& request, std::size_t maximumSize);
 bool streamBodyToFile(int socket, const HttpRequest& request, const std::filesystem::path& path);
 
-void respond(int socket, int status, const std::string& contentType, const std::string& body);
+void respond(int socket, int status, const std::string& contentType, const std::string& body,
+             const std::string& extraHeaders = "");
 void respondJson(int socket, int status, const std::string& body);
 void respondError(int socket, int status, const std::string& message);
 
 bool sendHead(int socket, int status, const std::string& contentType, unsigned long long length,
               const std::string& extraHeaders = "");
 bool sendBytes(int socket, const char* data, std::size_t size);
+
+enum class RangeResult { Full, Partial, Unsatisfiable };
+RangeResult parseByteRange(const std::string& header, unsigned long long size,
+                           unsigned long long& start, unsigned long long& end);
 
 inline std::string jsonEscape(const std::string& value) {
     std::string out;

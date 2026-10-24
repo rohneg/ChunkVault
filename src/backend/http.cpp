@@ -37,11 +37,13 @@ const char* reason(int status) {
     switch (status) {
         case 200: return "OK";
         case 201: return "Created";
+        case 206: return "Partial Content";
         case 400: return "Bad Request";
         case 403: return "Forbidden";
         case 404: return "Not Found";
         case 405: return "Method Not Allowed";
         case 413: return "Payload Too Large";
+        case 416: return "Range Not Satisfiable";
         default: return "Internal Server Error";
     }
 }
@@ -181,8 +183,33 @@ bool sendHead(int socket, int status, const std::string& contentType, unsigned l
     return sendAll(socket, head.data(), head.size());
 }
 
-void respond(int socket, int status, const std::string& contentType, const std::string& body) {
-    if (sendHead(socket, status, contentType, body.size())) sendAll(socket, body.data(), body.size());
+void respond(int socket, int status, const std::string& contentType, const std::string& body,
+             const std::string& extraHeaders) {
+    if (sendHead(socket, status, contentType, body.size(), extraHeaders)) sendAll(socket, body.data(), body.size());
+}
+
+RangeResult parseByteRange(const std::string& header, unsigned long long size,
+                           unsigned long long& start, unsigned long long& end) {
+    if (header.rfind("bytes=", 0) != 0 || header.find(',') != std::string::npos) return RangeResult::Full;
+    const std::string spec = header.substr(6);
+    const size_t dash = spec.find('-');
+    if (dash == std::string::npos) return RangeResult::Full;
+    const std::string first = spec.substr(0, dash), last = spec.substr(dash + 1);
+    try {
+        if (first.empty()) {
+            const unsigned long long suffix = std::stoull(last);
+            if (suffix == 0 || size == 0) return RangeResult::Unsatisfiable;
+            start = suffix >= size ? 0 : size - suffix;
+            end = size - 1;
+        } else {
+            start = std::stoull(first);
+            end = last.empty() ? size - 1 : std::min<unsigned long long>(std::stoull(last), size - 1);
+            if (start >= size || start > end) return RangeResult::Unsatisfiable;
+        }
+    } catch (...) {
+        return RangeResult::Full;
+    }
+    return RangeResult::Partial;
 }
 
 void respondJson(int socket, int status, const std::string& body) {

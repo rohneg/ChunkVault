@@ -8,6 +8,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <mutex>
 #include <random>
 #include <stdexcept>
 #include <unordered_map>
@@ -23,6 +24,26 @@ std::uintmax_t autoChunkSize(std::uintmax_t fileSize) {
     const double baseChunk = 256.0 * 1024 * 1024, baseFile = 1024.0 * 1024 * 1024;
     auto size = static_cast<std::uintmax_t>(baseChunk * std::pow(static_cast<double>(fileSize) / baseFile, 0.65));
     return std::min({std::max(size, minimum), maximum, fileSize});
+}
+
+bool healthyCached(const std::string& path, const std::string& expectedChecksum) {
+    static std::mutex lock;
+    static std::unordered_map<std::string, std::pair<std::uintmax_t, fs::file_time_type>> verified;
+
+    std::error_code error;
+    const auto size = fs::file_size(path, error);
+    const auto time = fs::last_write_time(path, error);
+    if (error) return false;
+    const std::string key = path + '|' + expectedChecksum;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        const auto found = verified.find(key);
+        if (found != verified.end() && found->second.first == size && found->second.second == time) return true;
+    }
+    if (status(path, expectedChecksum) != "HEALTHY") return false;
+    std::lock_guard<std::mutex> guard(lock);
+    verified[key] = {size, time};
+    return true;
 }
 
 std::string toHex(const unsigned char* bytes, std::size_t count) {
@@ -82,7 +103,12 @@ std::string detectMime(const fs::path& path, const std::string& name) {
     if (at(0, "OggS")) return "audio/ogg";
     if (at(0, "fLaC")) return "audio/flac";
     if (at(0, "ID3")) return "audio/mpeg";
-    if (at(4, "ftyp")) return "video/mp4";
+    if (at(0, "\x1A\x45\xDF\xA3")) return ext == ".mkv" ? "video/x-matroska" : "video/webm";
+    if (at(4, "ftyp")) {
+        if (at(8, "qt  ")) return "video/quicktime";
+        if (at(8, "M4A ")) return "audio/mp4";
+        return "video/mp4";
+    }
     if (at(0, "\x1f\x8b")) return "application/gzip";
     if (at(0, "Rar!")) return "application/vnd.rar";
     if (at(0, "7z\xBC\xAF")) return "application/x-7z-compressed";
@@ -228,17 +254,30 @@ StoreResult storeFile(Database& database, const fs::path& source, const std::str
 }
 
 RestoreResult reconstruct(const std::vector<ChunkRecord>& chunks,
-                          const std::function<bool(const char*, std::size_t)>& sink) {
+                          const std::function<bool(const char*, std::size_t)>& sink,
+                          std::uint64_t offset, std::uint64_t length) {
+    constexpr std::uint64_t kMax = std::numeric_limits<std::uint64_t>::max();
+    const bool partial = offset != 0 || length != kMax;
+    const std::uint64_t end = length > kMax - offset ? kMax : offset + length;
+
     RestoreResult result;
     CC_SHA256_CTX context;
     CC_SHA256_Init(&context);
     std::vector<char> buffer(1 << 20);
 
+    std::uint64_t position = 0;
     for (const auto& chunk : chunks) {
+        const std::uint64_t chunkStart = position, chunkEnd = position + chunk.chunkSize;
+        position = chunkEnd;
+        if (chunkEnd <= offset) continue;
+        if (chunkStart >= end) break;
+
         const auto paths = locations(chunk);
         int source = -1;
-        for (int i = 0; i < 3 && source < 0; ++i) {
-            if (status(paths[static_cast<size_t>(i)], chunk.checksum) == "HEALTHY") source = i;
+        for (size_t i = 0; i < paths.size() && source < 0; ++i) {
+            const bool healthy = partial ? healthyCached(paths[i], chunk.checksum)
+                                         : status(paths[i], chunk.checksum) == "HEALTHY";
+            if (healthy) source = static_cast<int>(i);
         }
         if (source < 0) {
             throw std::runtime_error("Chunk " + std::to_string(chunk.chunkNumber) +
@@ -248,10 +287,15 @@ RestoreResult reconstruct(const std::vector<ChunkRecord>& chunks,
 
         std::ifstream input(paths[static_cast<size_t>(source)], std::ios::binary);
         if (!input) throw std::runtime_error("Unable to read chunk " + std::to_string(chunk.chunkNumber) + ".");
-        while (input.read(buffer.data(), static_cast<std::streamsize>(buffer.size())) || input.gcount() > 0) {
+        const std::uint64_t from = std::max(chunkStart, offset), to = std::min(chunkEnd, end);
+        input.seekg(static_cast<std::streamoff>(from - chunkStart));
+        for (std::uint64_t left = to - from; left > 0;) {
+            input.read(buffer.data(), static_cast<std::streamsize>(std::min<std::uint64_t>(buffer.size(), left)));
             const auto got = static_cast<std::size_t>(input.gcount());
+            if (got == 0) throw std::runtime_error("Unable to read chunk " + std::to_string(chunk.chunkNumber) + ".");
             CC_SHA256_Update(&context, buffer.data(), static_cast<CC_LONG>(got));
             if (!sink(buffer.data(), got)) throw std::runtime_error("The output was closed before the file was complete.");
+            left -= got;
         }
     }
 
