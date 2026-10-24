@@ -9,12 +9,8 @@
         --accent: #6e9cf5; --good: #4cc790; --warn: #e0b05a; --bad: #f27c7c;
     }
 }
-* { 
-    box-sizing: border-box; 
-}
-body { 
-    margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; 
-}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 
 header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 10px 24px; background: var(--card); border-bottom: 1px solid var(--line); }
 header h1 { margin: 0; font-size: 17px; }
@@ -78,6 +74,7 @@ svg.graph { width: 100%; max-height: 460px; margin-top: 12px; color: var(--muted
 dialog { width: min(760px, 94vw); background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
 dialog pre { max-height: 60vh; overflow: auto; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 dialog img { display: block; max-width: 100%; max-height: 70vh; margin: 8px auto; }
+dialog video, dialog audio { display: block; width: 100%; max-height: 70vh; margin: 8px 0; }
 dialog iframe { width: 100%; height: 70vh; border: 1px solid var(--line); border-radius: 6px; }
 dialog::backdrop { background: rgb(0 0 0 / 50%); }
 
