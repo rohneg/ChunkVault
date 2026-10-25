@@ -397,7 +397,7 @@ async function viewFile(file) {
         $("vstatus").textContent = type;
         $("vcontent").hidden = true;
         $("vmedia").innerHTML = player
-            ? `<${player} controls preload="metadata" src="${url}" onerror="this.replaceWith('This browser cannot play this file. Use Download instead.')"></${player}>`
+            ? `<${player} controls preload="metadata" src="${url}" onerror="this.replaceWith('This browser cannot play this file (${type}). Use Download instead.')"></${player}>`
             : type === "application/pdf"
             ? `<iframe src="${url}" title="${esc(file.name)}"></iframe>`
             : `<img src="${url}" alt="${esc(file.name)}" onerror="this.replaceWith('Could not load the image. Run Replicate and try again.')">`;
