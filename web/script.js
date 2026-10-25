@@ -422,6 +422,10 @@ async function integrityPage(t) {
     main.innerHTML = `
         <div id="intmsg"></div>
         <div class="card"><h2>Files, chunks and replicas</h2><div id="summary"></div><div id="report"></div></div>
+        <div class="card"><h2>Reconstruct a file</h2>
+            <p class="muted">Rebuilds the complete file from its chunks, using a healthy copy of each one, then checks its size and SHA-256 against the original.</p>
+            <div class="row"><select id="rfile" aria-label="File to reconstruct"></select><button id="rbtn" class="primary">Reconstruct and verify</button></div>
+            <div id="rresult"></div></div>
         <dialog id="viewer"><h3 id="vtitle"></h3><p id="vstatus" class="muted"></p><div id="vmedia"></div><pre id="vcontent"></pre><button id="vclose">Close</button></dialog>`;
     $("vclose").onclick = () => $("viewer").close();
     $("viewer").onclose = () => { $("vmedia").innerHTML = ""; };
@@ -439,6 +443,35 @@ async function integrityPage(t) {
         }).join("") : empty("No files stored yet.");
     };
     draw();
+
+    $("rfile").innerHTML = state.files.map((f) => `<option value="${esc(f.id)}">${esc(f.name)} (${esc(f.id)})</option>`).join("") || '<option value="">No files stored</option>';
+    $("rbtn").disabled = !state.files.length;
+    $("rbtn").onclick = async () => {
+        const file = state.files.find((f) => f.id === $("rfile").value);
+        if (!file || busy) return;
+        busy = true;
+        $("rbtn").disabled = true;
+        $("rresult").innerHTML = note(`Reconstructing ${file.name} from its chunks…`);
+        try {
+            const r = await api(`/api/files/${encodeURIComponent(file.id)}/reconstruct`, { method: "POST" });
+            const verdict = r.sizeMatch && r.hashMatch === true ? note("File reconstructed. Its size and SHA-256 match the original.", "success")
+                : r.sizeMatch && r.hashMatch === null ? note("File reconstructed and the size matches, but no SHA-256 was stored for it, so the content could not be verified.", "warning")
+                : note(`The rebuilt file does not match the original (${fmtSize(r.bytes)} rebuilt, ${fmtSize(r.expectedBytes)} expected).`, "error");
+            $("rresult").innerHTML = verdict +
+                `<p>Rebuilt <b>${fmtSize(r.bytes)}</b> from <b>${r.chunks.length}</b> chunk(s)${r.repaired ? ` · repaired ${r.repaired} damaged copy/copies` : ""}</p>` +
+                `<p class="muted mono">SHA-256 ${esc(r.sha256)}</p>` +
+                table(["Chunk", "Size", "Copy used"], r.chunks.map((c) => [c.number, fmtSize(c.size), esc(c.source)])) +
+                `<div class="row">${downloadLink(file)}</div>`;
+            if (r.repaired) {
+                chunks = (await api("/api/database")).chunks;
+                draw();
+            }
+        } catch (e) {
+            $("rresult").innerHTML = note(e.message, "error");
+        }
+        busy = false;
+        $("rbtn").disabled = false;
+    };
 
     $("report").onclick = async (e) => {
         const button = e.target.closest("button[data-act]");
