@@ -25,6 +25,7 @@ struct StoreResult {
 struct RestoreResult {
     std::string sha256;
     unsigned repaired = 0;
+    std::vector<int> sources;
 };
 
 std::string randomId(const std::string& prefix, int length);
@@ -38,6 +39,9 @@ inline std::array<std::string, 3> locations(const ChunkRecord& chunk) {
 std::array<std::string, 3> statuses(const ChunkRecord& chunk);
 
 unsigned recover(const ChunkRecord& chunk);
+
+std::string detectStoredType(const std::vector<ChunkRecord>& chunks, const std::string& name);
+unsigned refreshTypes(Database& database);
 
 StoreResult storeFile(Database& database, const std::filesystem::path& source,
                       const std::string& name, std::uintmax_t chunkCount = 0);

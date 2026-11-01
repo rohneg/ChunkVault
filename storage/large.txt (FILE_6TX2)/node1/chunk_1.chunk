@@ -1,0 +1,45 @@
+CHUNKVAULT LARGE-SCALE STORAGE TEST DATA
+
+ChunkVault is a chunk-based file storage system developed to demonstrate Operating System and Database Management System concepts. This test data is intended to evaluate file validation, adaptive chunking, buffered binary input and output, chunk identifiers, file identifiers, replica creation, and SHA-256 integrity verification.
+
+A file storage system must preserve the contents of the original file throughout the entire storage process. When a file is divided into chunks, every chunk must contain the correct sequence of bytes. Each chunk should have a unique identifier and must remain associated with the correct original file. The chunk number is important because reconstruction requires the chunks to be combined in their original order.
+
+Data integrity is an important requirement for reliable storage. ChunkVault calculates a SHA-256 checksum for each stored chunk. During integrity verification, the current checksum is compared against the checksum recorded when the chunk was originally stored. If both values match, the stored chunk is considered healthy. If the values differ, the chunk is considered corrupted. If the file cannot be found, the chunk is reported as missing.
+
+Replication provides additional copies of stored data. ChunkVault creates replicas in separate logical storage locations. Each replica should be verified independently because one copy may become corrupted while another remains healthy. A recovery mechanism can use a verified healthy replica to restore a damaged or missing copy.
+
+Large files provide useful test cases for evaluating buffered file operations. Reading and writing data in buffers avoids loading an entire large file into memory at once. The system can read a portion of the input file, write that portion to a chunk, and repeat the operation until all bytes have been processed. Correct handling of the final partial buffer is necessary to avoid losing or adding bytes.
+
+Adaptive chunking selects a chunk size based on the input file size and the system's configured limits. The goal is to balance the number of chunks, metadata overhead, storage operations, and memory usage. A suitable chunk size depends on the design of the storage system and should be evaluated using actual performance measurements.
+
+When multiple files are stored, each file must be identified independently. The storage system must not overwrite chunks belonging to another file. Metadata must preserve the relationship between the original file, its chunks, checksum values, and replica locations. Verification should report which file and which chunk has a problem.
+
+Operating System scheduling can help organize multiple file-processing requests. First Come, First Served processes jobs in arrival order, while Shortest Job First selects the job with the shortest estimated processing time. These algorithms can be compared by measuring waiting time, turnaround time, and actual execution time. Scheduling must not alter the original order of chunks used for reconstruction.
+
+Database integration can provide persistent metadata management. Tables can store file records, chunk records, checksums, storage locations, replica information, and processing status. Transactions can help ensure that metadata changes are committed consistently when an operation succeeds or rolled back when an operation fails.
+
+Testing should cover files of different sizes, valid and invalid input paths, missing chunks, corrupted chunks, healthy and damaged replicas, multiple-file storage, and original-file reconstruction. The reconstructed output should be compared byte by byte with the original file to establish whether the process preserved the data correctly.
+
+The purpose of this large-scale test is to examine the behavior of the storage system under different workloads. The number of generated chunks, processing duration, integrity verification results, and replica status should be recorded during testing. Performance conclusions should be based on measured results rather than assumptions.
+
+CHUNKVAULT TEST RECORD 001
+
+Input validation checks whether the selected file exists and can be opened. Chunk creation divides the file into portions based on the selected chunk size. Buffered reading transfers data into memory in manageable portions. Chunk writing stores each portion at its designated location. Replica creation writes additional copies of the chunk to the configured replica locations.
+
+CHUNKVAULT TEST RECORD 002
+
+Integrity verification calculates the checksum of a stored chunk and compares it with the expected checksum. A matching checksum indicates that the data matches the recorded version. A mismatching checksum indicates that the data has changed. A missing file indicates that the expected data is unavailable at that location. These results help distinguish healthy data from damaged or unavailable data.
+
+CHUNKVAULT TEST RECORD 003
+
+Multiple-file storage requires isolated storage paths and persistent metadata. The system should generate a separate identifier for each original file. Every chunk record must reference its original file identifier. Replica paths must be recorded accurately so the system can locate and verify each copy independently.
+
+CHUNKVAULT TEST RECORD 004
+
+Recovery begins by identifying the failed chunk and examining the available replicas. The system should verify candidate replicas using their expected checksums. Only a replica that passes verification should be used as the source for restoration. After restoration, the recovered chunk should be verified again.
+
+CHUNKVAULT TEST RECORD 005
+
+Reconstruction reads chunks in their original sequence and writes their contents to the output file. The final output should have the same size and byte contents as the original input. Tests should include files with multiple chunks and files whose size is not an exact multiple of the chunk size.
+
+END OF TEST RECORDS

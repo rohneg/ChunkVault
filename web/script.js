@@ -394,7 +394,7 @@ async function viewFile(file) {
     $("viewer").showModal();
     const player = PLAYABLE.has(type) ? (type.startsWith("video/") ? "video" : "audio") : "";
     if (player || /^image\/(png|jpeg|gif|webp|bmp)$/.test(type) || type === "application/pdf") {
-        $("vstatus").textContent = type;
+        $("vstatus").textContent = `Type: ${type}`;
         $("vcontent").hidden = true;
         $("vmedia").innerHTML = player
             ? `<${player} controls preload="metadata" src="${url}" onerror="this.replaceWith('This browser cannot play this file (${type}). Use Download instead.')"></${player}>`
@@ -407,7 +407,7 @@ async function viewFile(file) {
     try {
         const d = await api(`/api/files/${encodeURIComponent(file.id)}/content`);
         const view = decodeContent(d.contentHex || "");
-        $("vstatus").textContent = `${d.verified ? "Assembled from checksum-verified copies" : "At least one chunk has no verified copy"} · ${view.format}${d.truncated ? " · first 1 MB shown" : ""}`;
+        $("vstatus").textContent = `Type: ${type || "unknown"} · ${d.verified ? "Assembled from checksum-verified copies" : "At least one chunk has no verified copy"} · ${view.format}${d.truncated ? " · first 1 MB shown" : ""}`;
         $("vcontent").textContent = view.text || "(empty file)";
     } catch (e) {
         $("vstatus").textContent = e.message;

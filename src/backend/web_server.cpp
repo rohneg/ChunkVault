@@ -4,6 +4,7 @@
 #include "storage.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <csignal>
 #include <filesystem>
@@ -13,6 +14,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 #include <unordered_set>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -26,6 +28,7 @@ namespace {
 
 constexpr int kMaxInt = std::numeric_limits<int>::max();
 constexpr size_t kFormLimit = 524288;
+constexpr int kMaxConnections = 64;
 constexpr unsigned long long kMaxInlineRange = 2ULL * 1024 * 1024;
 
 std::string allowedOrigin;
@@ -346,6 +349,10 @@ void handleDownload(int socket, Database& database, const std::string& id, bool 
     FileRecord file;
     if (!database.getFile(id, file)) throw std::invalid_argument("The selected file does not exist.");
     const auto chunks = loadChunks(database, id);
+    if (file.mimeType.empty() || file.mimeType == "application/octet-stream") {
+        const std::string detected = storage::detectStoredType(chunks, file.fileName);
+        if (!detected.empty() && detected != file.mimeType && database.updateFileType(id, detected)) file.mimeType = detected;
+    }
     if (inlineView && !previewable.count(file.mimeType)) {
         throw std::invalid_argument("This file type cannot be previewed in the browser.");
     }
@@ -353,7 +360,7 @@ void handleDownload(int socket, Database& database, const std::string& id, bool 
     std::string headers = "X-Content-Type-Options: nosniff\r\nAccept-Ranges: bytes\r\n";
     if (inlineView) {
         headers += "Content-Disposition: inline\r\n";
-        if (file.mimeType != "application/pdf") headers += "Content-Security-Policy: sandbox\r\n";
+        if (file.mimeType.rfind("image/", 0) == 0) headers += "Content-Security-Policy: sandbox\r\n";
     } else {
         headers += "Content-Disposition: attachment; filename=\"" + asciiName(file.fileName) +
                    "\"; filename*=UTF-8''" + urlEncode(file.fileName) + "\r\n";
@@ -398,6 +405,44 @@ void handleDownload(int socket, Database& database, const std::string& id, bool 
     }
 }
 
+std::string reconstructFile(Database& database, const std::string& id) {
+    FileRecord file;
+    if (!database.getFile(id, file)) throw std::invalid_argument("The selected file does not exist.");
+    const auto chunks = loadChunks(database, id);
+
+    unsigned long long bytes = 0;
+    const auto result = storage::reconstruct(chunks, [&](const char*, size_t size) {
+        bytes += size;
+        return true;
+    });
+
+    const bool sizeMatch = bytes == file.originalSize;
+    const bool hashKnown = !file.fileSha256.empty();
+    const bool hashMatch = hashKnown && result.sha256 == file.fileSha256;
+    const std::string outcome = !sizeMatch ? "size mismatch" : !hashKnown ? "no stored hash" : hashMatch ? "SHA-256 verified" : "SHA-256 MISMATCH";
+
+    database.logActivity("RECONSTRUCT", id + ": reconstructed " + to_string(chunks.size()) + " chunk(s), " + outcome + ".");
+    if (result.repaired > 0) {
+        database.logActivity("RECOVERY", id + ": restored " + to_string(result.repaired) + " copy/copies.");
+    }
+
+    static const char* names[3] = {"Main", "Node 1", "Node 2"};
+    std::string list = "[";
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        if (i) list += ',';
+        const int source = i < result.sources.size() ? result.sources[i] : -1;
+        list += "{\"number\":" + to_string(chunks[i].chunkNumber) + ",\"size\":" + to_string(chunks[i].chunkSize) +
+                ",\"source\":" + quote(source >= 0 ? names[source] : "—") + "}";
+    }
+    list += "]";
+
+    return "{\"fileId\":" + quote(id) + ",\"name\":" + quote(file.fileName) + ",\"bytes\":" + to_string(bytes) +
+           ",\"expectedBytes\":" + to_string(file.originalSize) + ",\"sha256\":" + quote(result.sha256) +
+           ",\"expectedSha256\":" + quote(file.fileSha256) + ",\"sizeMatch\":" + (sizeMatch ? "true" : "false") +
+           ",\"hashMatch\":" + (hashKnown ? (hashMatch ? "true" : "false") : "null") +
+           ",\"repaired\":" + to_string(result.repaired) + ",\"chunks\":" + list + "}";
+}
+
 void handleFileRoute(int socket, const HttpRequest& request, const std::string& suffix) {
     const size_t slash = suffix.find('/');
     const std::string id = suffix.substr(0, slash);
@@ -413,6 +458,7 @@ void handleFileRoute(int socket, const HttpRequest& request, const std::string& 
         return respondJson(socket, 200, "{\"fileId\":" + quote(id) + ",\"chunks\":" + chunksJson(loadChunks(database, id, false)) + "}");
     }
     if (m == "POST" && action == "verify") return respondJson(socket, 200, verifyFile(database, id));
+    if (m == "POST" && action == "reconstruct") return respondJson(socket, 200, reconstructFile(database, id));
     if (m == "POST" && action == "recover") return respondJson(socket, 200, recoverFile(database, id));
     if (m == "GET" && action == "content") return respondJson(socket, 200, fileContentJson(database, id));
     if (m == "GET" && action == "download") return handleDownload(socket, database, id, parseForm(request.query)["inline"] == "1", request.header("range"));
@@ -565,17 +611,44 @@ int runWebServer(unsigned short port) {
         return 1;
     }
 
+    {
+        Database database;
+        if (database.connect()) {
+            const unsigned fixed = storage::refreshTypes(database);
+            if (fixed) std::cout << "Updated the file type of " << fixed << " stored file(s).\n";
+        }
+    }
+
+    mysql_library_init(0, nullptr, nullptr);
+
     std::cout << "ChunkVault is available at http://127.0.0.1:" << port << "/\nPress Ctrl+C to stop the server.\n";
+    static std::atomic<int> active{0};
     for (;;) {
         const int client = accept(server, nullptr, nullptr);
         if (client < 0) {
             if (errno != EINTR) std::cerr << "Unable to accept a web request.\n";
             continue;
         }
-        const timeval sendTimeout{15, 0};
-        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, sizeof(sendTimeout));
-        handleConnection(client);
-        shutdown(client, SHUT_RDWR);
-        close(client);
+        const timeval timeout{30, 0};
+        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        if (active.load() >= kMaxConnections) {
+            respondError(client, 503, "The server is busy. Try again in a moment.");
+            close(client);
+            continue;
+        }
+        ++active;
+        try {
+            std::thread([client] {
+                try { handleConnection(client); } catch (...) {}
+                shutdown(client, SHUT_RDWR);
+                close(client);
+                mysql_thread_end();
+                --active;
+            }).detach();
+        } catch (...) {
+            --active;
+            close(client);
+        }
     }
 }

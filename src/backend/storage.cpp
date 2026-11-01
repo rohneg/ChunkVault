@@ -61,7 +61,7 @@ std::string toHex(const unsigned char* bytes, std::size_t count) {
 
 std::string randomId(const std::string& prefix, int length) {
     static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    static std::random_device random;
+    thread_local std::random_device random;
     std::string id = prefix;
     for (int i = 0; i < length; ++i) id += alphabet[random() % (sizeof(alphabet) - 1)];
     return id;
@@ -132,7 +132,14 @@ std::string detectMime(const fs::path& path, const std::string& name) {
         if (byte == 0) text = false;
         else if (byte < 9 || (byte > 13 && byte < 32)) ++control;
     }
-    if (!text || control * 50 > size) return "application/octet-stream";
+    if (!text || control * 50 > size) {
+        static const std::unordered_map<std::string, const char*> mediaTypes = {
+            {".mp4", "video/mp4"}, {".m4v", "video/mp4"}, {".mov", "video/quicktime"}, {".webm", "video/webm"},
+            {".mp3", "audio/mpeg"}, {".m4a", "audio/mp4"}, {".wav", "audio/wav"}, {".ogg", "audio/ogg"},
+            {".oga", "audio/ogg"}, {".flac", "audio/flac"}};
+        const auto media = mediaTypes.find(ext);
+        return media == mediaTypes.end() ? "application/octet-stream" : media->second;
+    }
 
     static const std::unordered_map<std::string, const char*> textTypes = {
         {".json", "application/json"}, {".xml", "application/xml"}, {".html", "text/html"}, {".htm", "text/html"},
@@ -171,6 +178,29 @@ unsigned recover(const ChunkRecord& chunk) {
         if (!error && status(paths[i], chunk.checksum) == "HEALTHY") ++restored;
     }
     return restored;
+}
+
+std::string detectStoredType(const std::vector<ChunkRecord>& chunks, const std::string& name) {
+    if (chunks.empty()) return "";
+    for (const auto& path : locations(chunks.front())) {
+        std::error_code ignored;
+        if (fs::is_regular_file(path, ignored)) return detectMime(path, name);
+    }
+    return "";
+}
+
+unsigned refreshTypes(Database& database) {
+    std::vector<FileRecord> files;
+    if (!database.getFiles(files)) return 0;
+    unsigned updated = 0;
+    for (const auto& file : files) {
+        if (!file.mimeType.empty() && file.mimeType != "application/octet-stream") continue;
+        std::vector<ChunkRecord> chunks;
+        if (!database.getChunks(chunks, file.fileId)) continue;
+        const std::string detected = detectStoredType(chunks, file.fileName);
+        if (!detected.empty() && detected != file.mimeType && database.updateFileType(file.fileId, detected)) ++updated;
+    }
+    return updated;
 }
 
 StoreResult storeFile(Database& database, const fs::path& source, const std::string& name,
@@ -261,12 +291,14 @@ RestoreResult reconstruct(const std::vector<ChunkRecord>& chunks,
     const std::uint64_t end = length > kMax - offset ? kMax : offset + length;
 
     RestoreResult result;
+    result.sources.assign(chunks.size(), -1);
     CC_SHA256_CTX context;
     CC_SHA256_Init(&context);
     std::vector<char> buffer(1 << 20);
 
     std::uint64_t position = 0;
-    for (const auto& chunk : chunks) {
+    for (size_t index = 0; index < chunks.size(); ++index) {
+        const auto& chunk = chunks[index];
         const std::uint64_t chunkStart = position, chunkEnd = position + chunk.chunkSize;
         position = chunkEnd;
         if (chunkEnd <= offset) continue;
@@ -284,6 +316,7 @@ RestoreResult reconstruct(const std::vector<ChunkRecord>& chunks,
                                      " has no healthy copy. Run Replicate first.");
         }
         if (source > 0) result.repaired += recover(chunk);
+        result.sources[index] = source;
 
         std::ifstream input(paths[static_cast<size_t>(source)], std::ios::binary);
         if (!input) throw std::runtime_error("Unable to read chunk " + std::to_string(chunk.chunkNumber) + ".");

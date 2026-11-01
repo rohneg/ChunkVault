@@ -141,7 +141,7 @@ bool Database::deleteFile(const std::string& fileId) {
         query("DELETE FROM activity_logs WHERE "
               "(`action`='STORAGE' AND details LIKE '% (" + id + ") stored with %') OR "
               "(`action`='VERIFY' AND details LIKE 'Verified " + id + " (%') OR "
-              "(`action` IN ('RECOVERY','RECOVERY_NOOP','SIMULATE_CORRUPTION','SIMULATE_MISSING') "
+              "(`action` IN ('RECOVERY','RECOVERY_NOOP','RECONSTRUCT','SIMULATE_CORRUPTION','SIMULATE_MISSING') "
               "AND details LIKE '" + id + ":%')") &&
         query("DELETE FROM chunks WHERE file_id='" + id + "'") &&
         query("DELETE FROM files WHERE file_id='" + id + "'") &&
@@ -195,6 +195,10 @@ bool Database::getChunks(std::vector<ChunkRecord>& chunks, const std::string& fi
         chunks.push_back({text(row[0]), text(row[1]), static_cast<unsigned int>(number(row[2])),
                           number(row[3]), text(row[4]), text(row[5]), text(row[6]), text(row[7])});
     });
+}
+
+bool Database::updateFileType(const std::string& fileId, const std::string& mimeType) {
+    return isConnected() && query("UPDATE files SET mime_type='" + escape(mimeType) + "' WHERE file_id='" + escape(fileId) + "'");
 }
 
 bool Database::ensureActivityTable() {

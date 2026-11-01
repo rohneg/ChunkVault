@@ -54,6 +54,7 @@ public:
 
     bool getFiles(std::vector<FileRecord>& files);
     bool getFile(const std::string& fileId, FileRecord& file);
+    bool updateFileType(const std::string& fileId, const std::string& mimeType);
     bool getChunks(std::vector<ChunkRecord>& chunks, const std::string& fileId = "");
     bool getActivities(std::vector<ActivityRecord>& activities);
     bool deleteActivity(unsigned long long activityId);

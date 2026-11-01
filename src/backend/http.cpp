@@ -43,6 +43,7 @@ const char* reason(int status) {
         case 404: return "Not Found";
         case 405: return "Method Not Allowed";
         case 413: return "Payload Too Large";
+        case 503: return "Service Unavailable";
         case 416: return "Range Not Satisfiable";
         default: return "Internal Server Error";
     }
