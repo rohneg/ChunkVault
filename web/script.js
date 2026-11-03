@@ -484,7 +484,7 @@ async function integrityPage(t) {
             const own = chunks.filter((c) => c.fileId === f.id);
             const button = (act, label) => `<button data-act="${act}" data-id="${esc(f.id)}">${label}</button>`;
             return `<div class="file"><div class="row"><b>${esc(f.name)}</b><span class="muted mono">${esc(f.type)} · ${esc(f.id)} · ${fmtSize(f.size)} · ${own.length} chunk(s)</span>` +
-                `<span class="spacer"></span>${button("view", "View")}${downloadLink(f)}${button("verify", "Verify")}${button("recover", "Replicate")}</div>` +
+                `<span class="spacer"></span>${button("view", "View")}${button("verify", "Verify")}${button("recover", "Replicate")}</div>` +
                 table(["Chunk", "Size", "Main", "Node 1", "Node 2"], own.map((c) => [c.number, fmtSize(c.size), badge(c.main.status), badge(c.node1.status), badge(c.node2.status)]), "No chunk records for this file.") + "</div>";
         }).join("") : empty("No files stored yet.");
     };
