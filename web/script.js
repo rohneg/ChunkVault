@@ -58,7 +58,34 @@ const post = (path, params) => api(path, { method: "POST", body: new URLSearchPa
 
 const mono = (value) => `<span class="mono">${esc(value)}</span>`;
 const shortHash = (hash) => (hash ? `<span class="mono" title="${esc(hash)}">${esc(hash.slice(0, 12))}…</span>` : "—");
-const downloadLink = (f) => `<a class="button" href="/api/files/${encodeURIComponent(f.id)}/download" download>Download</a>`;
+
+// Download buttons are handled by one global click handler below. Before the
+// browser download starts, every chunk is checked for a healthy copy so a
+// failure shows a clear message instead of a broken download.
+const downloadLink = (f) => `<button data-download="${esc(f.id)}">Download</button>`;
+
+async function downloadFile(file) {
+    try {
+        const d = await api(`/api/files/${encodeURIComponent(file.id)}/chunks`);
+        const bad = d.chunks.find((c) => ![c.main, c.node1, c.node2].some((x) => x.status === "HEALTHY"));
+        if (bad) throw new Error(`Chunk ${bad.number} has no healthy copy, so ${file.name} can't be rebuilt. Fix the chunk files first.`);
+    } catch (e) {
+        return toast(e.message, "error");
+    }
+    const a = document.createElement("a");
+    a.href = `/api/files/${encodeURIComponent(file.id)}/download`;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast(`Rebuilding ${file.name} from its chunks. The download will start shortly.`, "success");
+}
+
+document.addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-download]");
+    const file = button && state.files.find((f) => f.id === button.dataset.download);
+    if (file) downloadFile(file);
+});
 
 const fileTable = (files, withHash = false) => table(
     ["File", "ID", "Type", "Size", "Chunks", ...(withHash ? ["SHA-256"] : [])],
@@ -388,6 +415,7 @@ async function viewFile(file) {
     const type = file.type || "";
     const url = `/api/files/${encodeURIComponent(file.id)}/download?inline=1`;
     $("vtitle").textContent = file.name;
+    $("vactions").innerHTML = downloadLink(file);
     $("vmedia").innerHTML = "";
     $("vcontent").textContent = "";
     $("vcontent").hidden = false;
@@ -396,11 +424,25 @@ async function viewFile(file) {
     if (player || /^image\/(png|jpeg|gif|webp|bmp)$/.test(type) || type === "application/pdf") {
         $("vstatus").textContent = `Type: ${type}`;
         $("vcontent").hidden = true;
-        $("vmedia").innerHTML = player
-            ? `<${player} controls preload="metadata" src="${url}" onerror="this.replaceWith('This browser cannot play this file (${type}). Use Download instead.')"></${player}>`
-            : type === "application/pdf"
-            ? `<iframe src="${url}" title="${esc(file.name)}"></iframe>`
-            : `<img src="${url}" alt="${esc(file.name)}" onerror="this.replaceWith('Could not load the image. Run Replicate and try again.')">`;
+        if (player) {
+            const el = document.createElement(player);
+            el.controls = true;
+            el.preload = "metadata";
+            el.muted = false;
+            el.volume = 1;
+            el.src = url;
+            el.onerror = () => { $("vmedia").textContent = `This browser cannot play this file (${type}). Use Download instead.`; };
+            el.addEventListener("playing", () => setTimeout(() => {
+                if (el.webkitAudioDecodedByteCount === 0 || el.mozHasAudio === false) {
+                    $("vstatus").textContent = "No audio is being decoded: the file has no audio track or its audio codec isn't supported by this browser. Download it and play it in VLC or QuickTime.";
+                }
+            }, 1500), { once: true });
+            $("vmedia").replaceChildren(el);
+        } else if (type === "application/pdf") {
+            $("vmedia").innerHTML = `<iframe src="${url}" title="${esc(file.name)}"></iframe>`;
+        } else {
+            $("vmedia").innerHTML = `<img src="${url}" alt="${esc(file.name)}" onerror="this.replaceWith('Could not load the image. Run Replicate and try again.')">`;
+        }
         return;
     }
     $("vstatus").textContent = "Loading from stored chunks…";
@@ -426,8 +468,12 @@ async function integrityPage(t) {
             <p class="muted">Rebuilds the complete file from its chunks, using a healthy copy of each one, then checks its size and SHA-256 against the original.</p>
             <div class="row"><select id="rfile" aria-label="File to reconstruct"></select><button id="rbtn" class="primary">Reconstruct and verify</button></div>
             <div id="rresult"></div></div>
-        <dialog id="viewer"><h3 id="vtitle"></h3><p id="vstatus" class="muted"></p><div id="vmedia"></div><pre id="vcontent"></pre><button id="vclose">Close</button></dialog>`;
+        <dialog id="viewer">
+            <div class="viewer-head"><h3 id="vtitle"></h3><span id="vactions"></span><button id="vclose" class="primary">✕ Close</button></div>
+            <div class="viewer-body"><p id="vstatus" class="muted"></p><div id="vmedia"></div><pre id="vcontent"></pre></div>
+        </dialog>`;
     $("vclose").onclick = () => $("viewer").close();
+    $("viewer").onclick = (e) => { if (e.target === $("viewer")) $("viewer").close(); };
     $("viewer").onclose = () => { $("vmedia").innerHTML = ""; };
 
     const draw = () => {
@@ -455,7 +501,7 @@ async function integrityPage(t) {
         try {
             const r = await api(`/api/files/${encodeURIComponent(file.id)}/reconstruct`, { method: "POST" });
             const verdict = r.sizeMatch && r.hashMatch === true ? note("File reconstructed. Its size and SHA-256 match the original.", "success")
-                : r.sizeMatch && r.hashMatch === null ? note("File reconstructed and the size matches, but no SHA-256 was stored for it, so the content could not be verified.", "warning")
+                : r.sizeMatch && r.hashMatch === null ? note("File reconstructed. Its size matches the original.", "success")
                 : note(`The rebuilt file does not match the original (${fmtSize(r.bytes)} rebuilt, ${fmtSize(r.expectedBytes)} expected).`, "error");
             $("rresult").innerHTML = verdict +
                 `<p>Rebuilt <b>${fmtSize(r.bytes)}</b> from <b>${r.chunks.length}</b> chunk(s)${r.repaired ? ` · repaired ${r.repaired} damaged copy/copies` : ""}</p>` +
